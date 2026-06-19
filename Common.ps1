@@ -386,6 +386,36 @@ function Find-NodeAddressesInYaml {
 }
 
 # ------------------------------------------------------------
+# Show-NodeInfo: 从配置目录读取节点地址并显示地理位置信息
+# 参数: -ConfigDir (内核目录路径)
+# ------------------------------------------------------------
+function Show-NodeInfo {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ConfigDir
+    )
+
+    $nodeInfos = Get-IPsFromConfig -ConfigDir $ConfigDir
+
+    if ($nodeInfos.Count -gt 0) {
+        Write-Host ""
+        Write-Host "=== 节点地理位置信息 ===" -ForegroundColor Cyan
+        foreach ($ni in $nodeInfos) {
+            $country = Get-IPCountry -IP $ni.IP
+            $label = if ($ni.Domain) { "$($ni.Domain) → $($ni.IP)" } else { $ni.IP }
+            if ($country) {
+                Write-Host "节点：$label`n国家：$country" -ForegroundColor Green
+            } else {
+                Write-Host "节点：$label `n国家：查询失败" -ForegroundColor Yellow
+            }
+        }
+        Write-Host ""
+    } else {
+        Write-Host "  未在配置文件中找到节点地址" -ForegroundColor DarkGray
+    }
+}
+
+# ------------------------------------------------------------
 # Invoke-IPUpdate: 执行 IP 更新流程（扫描目录 + 菜单选择 + 执行脚本 + 读取配置查询IP归属地）
 # 参数: -IPUpdateDir (IP更新目录的绝对路径)
 # ------------------------------------------------------------
@@ -428,24 +458,7 @@ function Invoke-IPUpdate {
         
         # 即使跳过更新，也读取配置文件显示节点 IP 归属地
         $configDir = Split-Path $IPUpdateDir -Parent
-        $nodeInfos = Get-IPsFromConfig -ConfigDir $configDir
-        
-        if ($nodeInfos.Count -gt 0) {
-            Write-Host ""
-            Write-Host "=== 节点地理位置信息 ===" -ForegroundColor Cyan
-            foreach ($ni in $nodeInfos) {
-                $country = Get-IPCountry -IP $ni.IP
-                $label = if ($ni.Domain) { "$($ni.Domain) → $($ni.IP)" } else { $ni.IP }
-                if ($country) {
-                    Write-Host "节点：$label  国家：$country" -ForegroundColor Green
-                } else {
-                    Write-Host "节点：$label  国家：查询失败" -ForegroundColor Yellow
-                }
-            }
-            Write-Host ""
-        } else {
-            Write-Host "  未在配置文件中找到节点地址" -ForegroundColor DarkGray
-        }
+        Show-NodeInfo -ConfigDir $configDir
         
         return
     }
@@ -507,25 +520,7 @@ function Invoke-IPUpdate {
                 
                 # 从内核配置文件中提取节点 IP/域名 并查询地理位置
                 $configDir = Split-Path $IPUpdateDir -Parent
-                $nodeInfos = Get-IPsFromConfig -ConfigDir $configDir
-                
-                if ($nodeInfos.Count -gt 0) {
-                    Write-Host ""
-                    Write-Host "=== 节点地理位置信息 ===" -ForegroundColor Cyan
-                    
-                    foreach ($ni in $nodeInfos) {
-                        $country = Get-IPCountry -IP $ni.IP
-                        $label = if ($ni.Domain) { "$($ni.Domain) → $($ni.IP)" } else { $ni.IP }
-                        if ($country) {
-                            Write-Host "节点：$label  国家：$country" -ForegroundColor Green
-                        } else {
-                            Write-Host "节点：$label  国家：查询失败" -ForegroundColor Yellow
-                        }
-                    }
-                    Write-Host ""
-                } else {
-                    Write-Host "  未在配置文件中找到节点地址" -ForegroundColor DarkGray
-                }
+                Show-NodeInfo -ConfigDir $configDir
             }
         } catch {
             Write-Host "执行脚本时出错: $_" -ForegroundColor Red
