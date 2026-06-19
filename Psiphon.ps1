@@ -17,6 +17,9 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 # 设置控制台标题
 $Host.UI.RawUI.WindowTitle = "Psiphon 一键翻墙"
 
+# 引入公共函数库
+. "$PSScriptRoot\Common.ps1"
+
 # ==================== 配置常量（请根据实际情况修改） ====================
 # 内核目录（相对于脚本所在目录）
 $CORE_DIR = "psiphon"
@@ -44,6 +47,13 @@ try {
     
     $workingDir = Join-Path $PSScriptRoot $CORE_DIR
     
+    # 二次确认启动
+    if (-not (Confirm-Launch -CoreName "Psiphon ($CORE_EXE)")) {
+        Write-Host "按任意键退出..."
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        exit 0
+    }
+
     # 启动 psiphon3.exe
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
     $process = Start-Process -FilePath $corePath -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
