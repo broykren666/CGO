@@ -50,6 +50,13 @@ try {
         exit 1
     }
     
+    # 二次确认启动
+    if (-not (Confirm-Launch -CoreName "NaiveProxy ($CORE_EXE)")) {
+        Write-Host "按任意键退出..."
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        exit 0
+    }
+
     # 启动内核（naiveproxy 参数格式：naive.exe "config.json"）
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
     

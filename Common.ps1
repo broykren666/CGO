@@ -514,3 +514,63 @@ function Invoke-IPUpdate {
         Write-Host "无效的选择！" -ForegroundColor Red
     }
 }
+
+# ------------------------------------------------------------
+# Confirm-Launch: 启动内核前二次确认
+# 参数: -CoreName (内核名称，用于显示)
+#       -TimeoutSeconds (超时秒数，超时后默认确认启动，默认10秒)
+# 返回: $true 表示确认启动，$false 表示取消
+# ------------------------------------------------------------
+function Confirm-Launch {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CoreName,
+        [int]$TimeoutSeconds = 10
+    )
+
+    Write-Host ""
+    Write-Host "----------------------------------------" -ForegroundColor DarkGray
+    Write-Host "  即将启动: " -NoNewline
+    Write-Host $CoreName -ForegroundColor Yellow -NoNewline
+    Write-Host ""
+    Write-Host "  按 " -NoNewline
+    Write-Host "N" -ForegroundColor Red -NoNewline
+    Write-Host " 取消，其他任意键或等待 " -NoNewline
+    Write-Host "${TimeoutSeconds}s" -ForegroundColor Cyan -NoNewline
+    Write-Host " 后自动确认启动"
+    Write-Host "----------------------------------------" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "确认启动？[Y/n] " -NoNewline -ForegroundColor White
+
+    $startTime = Get-Date
+    $keyPressed = $null
+
+    while (((Get-Date) - $startTime).TotalSeconds -lt $TimeoutSeconds) {
+        if ([Console]::KeyAvailable) {
+            $key = [Console]::ReadKey($true)
+            $keyPressed = $key.KeyChar.ToString()
+            break
+        }
+        # 每秒刷新倒计时显示
+        $elapsed = [int]((Get-Date) - $startTime).TotalSeconds
+        $remaining = $TimeoutSeconds - $elapsed
+        Write-Host "`r确认启动？[Y/n]  （$remaining 秒后自动启动）  " -NoNewline -ForegroundColor White
+        Start-Sleep -Milliseconds 200
+    }
+
+    Write-Host ""  # 换行
+
+    if ($null -eq $keyPressed) {
+        # 超时，默认确认
+        Write-Host "  超时自动确认，正在启动..." -ForegroundColor Green
+        return $true
+    }
+
+    if ($keyPressed -eq 'n' -or $keyPressed -eq 'N') {
+        Write-Host "  已取消启动。" -ForegroundColor Yellow
+        return $false
+    }
+
+    Write-Host "  已确认，正在启动..." -ForegroundColor Green
+    return $true
+}

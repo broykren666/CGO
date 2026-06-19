@@ -50,6 +50,13 @@ try {
         exit 1
     }
     
+    # 二次确认启动
+    if (-not (Confirm-Launch -CoreName "Mieru ($CORE_EXE)")) {
+        Write-Host "按任意键退出..."
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        exit 0
+    }
+
     # 启动内核（mieru 需要先 apply config 再 start，两步操作）
     Write-Host "正在应用 Mieru 配置..." -ForegroundColor Cyan
     

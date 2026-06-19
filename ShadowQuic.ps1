@@ -50,6 +50,13 @@ try {
         exit 1
     }
     
+    # 二次确认启动
+    if (-not (Confirm-Launch -CoreName "ShadowQuic ($CORE_EXE)")) {
+        Write-Host "按任意键退出..."
+        $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+        exit 0
+    }
+
     # 启动内核（shadowquic 使用 client.yaml 配置文件）
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
     
