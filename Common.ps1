@@ -7,6 +7,23 @@
 $Script:IPINFO_TOKEN = "311cf96f8bbc1b"
 
 # ------------------------------------------------------------
+# Ensure-Admin: 检查管理员权限，非管理员则自动提权重启
+# 参数: -ScriptPath (当前脚本的完整路径，用于提权重启)
+# ------------------------------------------------------------
+function Ensure-Admin {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ScriptPath
+    )
+
+    if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        Write-Host "请求管理员权限..." -ForegroundColor Yellow
+        Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -File `"$ScriptPath`"" -Verb RunAs
+        exit
+    }
+}
+
+# ------------------------------------------------------------
 # Show-Menu: 显示编号菜单并获取用户选择
 # 参数: -Options (数组), -TimeoutSeconds (超时秒数), -DefaultOption (超时默认值)
 # ------------------------------------------------------------

@@ -1,24 +1,18 @@
-﻿#requires -RunAsAdministrator
-
-# 设置控制台编码为 UTF-8
+﻿# 设置控制台编码为 UTF-8
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 chcp 936 > $null
 
 # 切换到脚本所在目录
 Set-Location -Path $PSScriptRoot
 
-# 检查管理员权限
-if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Host "请求管理员权限..." -ForegroundColor Yellow
-    Start-Process -FilePath "powershell.exe" -ArgumentList "-NoProfile -File `"$PSCommandPath`"" -Verb RunAs
-    exit
-}
+# 引入公共函数库
+. "$PSScriptRoot\Common.ps1"
+
+# 检查管理员权限（若非管理员则自动提权重启）
+Ensure-Admin -ScriptPath $PSCommandPath
 
 # 设置控制台标题
 $Host.UI.RawUI.WindowTitle = "Clash.Meta 一键启动"
-
-# 引入公共函数库
-. "$PSScriptRoot\Common.ps1"
 
 # ==================== 配置常量（请根据实际情况修改） ====================
 # 内核目录（相对于脚本所在目录）
