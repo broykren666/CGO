@@ -517,10 +517,11 @@ function Show-NodeInfo {
     )
 
     $nodeInfos = Get-IPsFromConfig -ConfigDir $ConfigDir
+    
+    Write-Host ""
+    Write-Host "========== 节点 IP 信息 ==========" -ForegroundColor Cyan
 
-    if ($nodeInfos.Count -gt 0) {
-        Write-Host ""
-        Write-Host "========== 节点 IP 信息 ==========" -ForegroundColor Cyan
+    if ($nodeInfos.Count -gt 0) {        
         foreach ($ni in $nodeInfos) {
             $country = Get-IPCountry -IP $ni.IP
             $label = if ($ni.Domain) { "$($ni.Domain) → $($ni.IP)" } else { $ni.IP }
@@ -530,11 +531,10 @@ function Show-NodeInfo {
                 Write-Host " 📍 节点：$label`n 🌏 国家：查询失败" -ForegroundColor Yellow
             }
         }
-        Write-Host "==================================" -ForegroundColor Cyan
     } else {
-        Write-Host " 失败：未在配置文件中找到节点地址" -ForegroundColor DarkGray
-        Write-Host "==================================" -ForegroundColor Cyan
+        Write-Host " 失败：未在配置文件中找到节点地址" -ForegroundColor DarkGray        
     }
+    Write-Host "==================================" -ForegroundColor Cyan
 }
 
 # ------------------------------------------------------------
