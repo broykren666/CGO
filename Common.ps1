@@ -24,6 +24,110 @@ function Ensure-Admin {
 }
 
 # ------------------------------------------------------------
+# Initialize-Script: 控制台初始化（编码、目录、提权、标题）
+# 参数: -Title (窗口标题), -ScriptPath (当前脚本路径，用于提权重启)
+# ------------------------------------------------------------
+function Initialize-Script {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Title,
+        [Parameter(Mandatory=$true)]
+        [string]$ScriptPath
+    )
+
+    # 设置控制台编码为 UTF-8
+    [Console]::OutputEncoding = [Text.Encoding]::UTF8
+    chcp 936 > $null
+
+    # 切换到脚本所在目录
+    Set-Location -Path $PSScriptRoot
+
+    # 检查管理员权限（若非管理员则自动提权重启）
+    Ensure-Admin -ScriptPath $ScriptPath
+
+    # 设置控制台标题
+    $Host.UI.RawUI.WindowTitle = $Title
+}
+
+# ------------------------------------------------------------
+# Show-Banner: 显示绿色横幅
+# 参数: -Title (横幅标题文字)
+# ------------------------------------------------------------
+function Show-Banner {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Title
+    )
+
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "    $Title" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+}
+
+# ------------------------------------------------------------
+# Test-CoreFile: 检查内核文件是否存在，不存在则报错退出
+# 参数: -CoreDir (内核目录), -CoreExe (内核文件名)
+# 返回: 内核文件的完整路径
+# ------------------------------------------------------------
+function Test-CoreFile {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CoreDir,
+        [Parameter(Mandatory=$true)]
+        [string]$CoreExe
+    )
+
+    $corePath = Join-Path $PSScriptRoot (Join-Path $CoreDir $CoreExe)
+
+    if (-not (Test-Path $corePath)) {
+        Write-Host "错误: 内核文件不存在: $CoreExe" -ForegroundColor Red
+        Write-Host "请检查 CORE_EXE 配置是否正确" -ForegroundColor Red
+        Press-AnyKey
+        exit 1
+    }
+
+    return $corePath
+}
+
+# ------------------------------------------------------------
+# Press-AnyKey: 等待用户按任意键
+# 参数: -Message (提示信息，默认 "按任意键退出...")
+# ------------------------------------------------------------
+function Press-AnyKey {
+    param(
+        [string]$Message = "按任意键退出..."
+    )
+
+    Write-Host $Message
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
+
+# ------------------------------------------------------------
+# Wait-CoreStart: 等待内核启动并检查进程状态
+# 参数: -Process (Start-Process 返回的进程对象)
+# ------------------------------------------------------------
+function Wait-CoreStart {
+    param(
+        [Parameter(Mandatory=$true)]
+        $Process
+    )
+
+    # 等待一下确保启动
+    Start-Sleep -Seconds 2
+
+    if ($Process.HasExited) {
+        Write-Host "警告: 内核可能启动失败，进程已退出。" -ForegroundColor Yellow
+    } else {
+        Write-Host "内核已启动 (PID: $($Process.Id))" -ForegroundColor Green
+    }
+
+    Write-Host ""
+    Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
+
+# ------------------------------------------------------------
 # Show-Menu: 显示编号菜单并获取用户选择
 # 参数: -Options (数组), -TimeoutSeconds (超时秒数), -DefaultOption (超时默认值)
 # ------------------------------------------------------------
