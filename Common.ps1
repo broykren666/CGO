@@ -399,19 +399,20 @@ function Show-NodeInfo {
 
     if ($nodeInfos.Count -gt 0) {
         Write-Host ""
-        Write-Host "=== 节点地理位置信息 ===" -ForegroundColor Cyan
+        Write-Host "========== 节点 IP 信息 ==========" -ForegroundColor Cyan
         foreach ($ni in $nodeInfos) {
             $country = Get-IPCountry -IP $ni.IP
             $label = if ($ni.Domain) { "$($ni.Domain) → $($ni.IP)" } else { $ni.IP }
             if ($country) {
-                Write-Host "节点：$label`n国家：$country" -ForegroundColor Green
+                Write-Host " 📍 节点：$label`n 🌏 国家：$country" -ForegroundColor Green
             } else {
-                Write-Host "节点：$label `n国家：查询失败" -ForegroundColor Yellow
+                Write-Host " 📍 节点：$label`n 🌏 国家：查询失败" -ForegroundColor Yellow
             }
         }
-        Write-Host ""
+        Write-Host "==================================" -ForegroundColor Cyan
     } else {
-        Write-Host "  未在配置文件中找到节点地址" -ForegroundColor DarkGray
+        Write-Host " 失败：未在配置文件中找到节点地址" -ForegroundColor DarkGray
+        Write-Host "==================================" -ForegroundColor Cyan
     }
 }
 
@@ -445,7 +446,7 @@ function Invoke-IPUpdate {
         return
     }
     
-    Write-Host "是否执行IP更新？(⚠️首次使用务必先更新IP)" -ForegroundColor Yellow
+    Write-Host "是否执行IP更新？(⚠️ 首次使用务必先更新IP)" -ForegroundColor Yellow
     Write-Host ""
     
     # 显示菜单并获取选择
@@ -542,22 +543,21 @@ function Confirm-Launch {
     param(
         [Parameter(Mandatory=$true)]
         [string]$CoreName,
-        [int]$TimeoutSeconds = 10
+        [int]$TimeoutSeconds = 15
     )
 
-    Write-Host ""
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
-    Write-Host "  即将启动: " -NoNewline
+    Write-Host " 🚀 启动内核: " -NoNewline
     Write-Host $CoreName -ForegroundColor Yellow -NoNewline
     Write-Host ""
-    Write-Host "  按 " -NoNewline
+    Write-Host " ⚠️ 按 " -NoNewline
     Write-Host "N" -ForegroundColor Red -NoNewline
-    Write-Host " 取消，其他任意键或等待 " -NoNewline
+    Write-Host " 取消，" -NoNewline
     Write-Host "${TimeoutSeconds}s" -ForegroundColor Cyan -NoNewline
-    Write-Host " 后自动确认启动"
+    Write-Host " 后自动启动！"
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
     Write-Host ""
-    Write-Host "确认启动？[Y/n] " -NoNewline -ForegroundColor White
+    Write-Host "是否启动？[Y/n] " -NoNewline -ForegroundColor White
 
     $startTime = Get-Date
     $keyPressed = $null
