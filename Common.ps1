@@ -422,9 +422,31 @@ function Invoke-IPUpdate {
     $selectedIndex = Show-Menu -Options $ipScripts -TimeoutSeconds 17 -DefaultOption "0"
     $selectedNum = [int]$selectedIndex
     
-    # 如果选择 0 则跳过
+    # 如果选择 0 则跳过，但仍显示节点信息
     if ($selectedNum -eq 0) {
         Write-Host "跳过IP更新。" -ForegroundColor Gray
+        
+        # 即使跳过更新，也读取配置文件显示节点 IP 归属地
+        $configDir = Split-Path $IPUpdateDir -Parent
+        $nodeInfos = Get-IPsFromConfig -ConfigDir $configDir
+        
+        if ($nodeInfos.Count -gt 0) {
+            Write-Host ""
+            Write-Host "=== 节点地理位置信息 ===" -ForegroundColor Cyan
+            foreach ($ni in $nodeInfos) {
+                $country = Get-IPCountry -IP $ni.IP
+                $label = if ($ni.Domain) { "$($ni.Domain) → $($ni.IP)" } else { $ni.IP }
+                if ($country) {
+                    Write-Host "节点：$label  国家：$country" -ForegroundColor Green
+                } else {
+                    Write-Host "节点：$label  国家：查询失败" -ForegroundColor Yellow
+                }
+            }
+            Write-Host ""
+        } else {
+            Write-Host "  未在配置文件中找到节点地址" -ForegroundColor DarkGray
+        }
+        
         return
     }
     
