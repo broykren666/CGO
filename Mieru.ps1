@@ -4,22 +4,24 @@ Initialize-Script -Title "Mieru 一键翻墙" -ScriptPath $PSCommandPath
 # ==================== 配置常量（请根据实际情况修改） ====================
 $CORE_DIR = "mieru"
 $CORE_EXE = "mieru.exe"
-$IP_UPDATE_DIR = Join-Path $PSScriptRoot (Join-Path $CORE_DIR "ip_Update")
+$CORE_NAME = "Mieru"
 # ======================================================================
 
 try {
     Show-Banner -Title "Mieru 一键翻墙脚本"
-    Invoke-IPUpdate -IPUpdateDir $IP_UPDATE_DIR
+    
+    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME
+    if ($null -eq $selectedConfig) { Press-AnyKey; exit 0 }
 
     $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
 
-    if (-not (Confirm-Launch -CoreName "Mieru ($CORE_EXE)")) {
+    if (-not (Confirm-Launch -CoreName "$CORE_NAME ($CORE_EXE)")) {
         Press-AnyKey; exit 0
     }
 
     # 启动内核（mieru 需要先 apply config 再 start，两步操作）
     $workingDir = Join-Path $PSScriptRoot $CORE_DIR
-    $configPath = Join-Path $workingDir "config.json"
+    $configPath = Join-Path $workingDir $selectedConfig
 
     # 第一步：apply config
     Write-Host "正在应用 Mieru 配置..." -ForegroundColor Cyan

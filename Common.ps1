@@ -655,6 +655,429 @@ function Invoke-IPUpdate {
 }
 
 # ------------------------------------------------------------
+# Read-NodeCache: 读取内核目录下的 .node_cache 文件
+# 参数: -CoreDir (内核目录路径)
+# 返回: @{ConfigFile; Country; IP} 数组
+# ------------------------------------------------------------
+function Read-NodeCache {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CoreDir
+    )
+    
+    $cachePath = Join-Path $CoreDir ".node_cache"
+    $results = @()
+    
+    if (Test-Path $cachePath) {
+        $lines = Get-Content $cachePath -Encoding UTF8 -ErrorAction SilentlyContinue
+        foreach ($line in $lines) {
+            $parts = $line -split '\|'
+            if ($parts.Count -ge 3) {
+                $results += [PSCustomObject]@{
+                    ConfigFile = $parts[0].Trim()
+                    Country    = $parts[1].Trim()
+                    IP         = $parts[2].Trim()
+                }
+            }
+        }
+    }
+    
+    return $results
+}
+
+# ------------------------------------------------------------
+# Write-NodeCache: 写入 .node_cache（覆盖指定 config 行或追加）
+# 参数: -CoreDir, -ConfigFile, -Country, -IP
+# ------------------------------------------------------------
+function Write-NodeCache {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CoreDir,
+        [Parameter(Mandatory=$true)]
+        [string]$ConfigFile,
+        [Parameter(Mandatory=$true)]
+        [string]$Country,
+        [Parameter(Mandatory=$true)]
+        [string]$IP
+    )
+    
+    $cachePath = Join-Path $CoreDir ".node_cache"
+    $newLine = "$ConfigFile|$Country|$IP"
+    $lines = @()
+    $found = $false
+    
+    if (Test-Path $cachePath) {
+        $existing = Get-Content $cachePath -Encoding UTF8 -ErrorAction SilentlyContinue
+        foreach ($line in $existing) {
+            if ($line -match "^$([regex]::Escape($ConfigFile))\|") {
+                $lines += $newLine
+                $found = $true
+            } elseif ($line.Trim().Length -gt 0) {
+                $lines += $line
+            }
+        }
+    }
+    
+    if (-not $found) {
+        $lines += $newLine
+    }
+    
+    $lines | Set-Content $cachePath -Encoding UTF8
+}
+
+# ------------------------------------------------------------
+# Get-ConfigServerIP: 从配置文件中提取第一个 outbound 的 server 地址
+# 支持 .json 和 .yaml 两种格式
+# 参数: -ConfigPath (配置文件路径)
+# 返回: IP 地址字符串，失败返回 $null
+# ------------------------------------------------------------
+function Get-ConfigServerIP {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ConfigPath
+    )
+    
+    if (-not (Test-Path $ConfigPath)) { return $null }
+    
+    $ext = [System.IO.Path]::GetExtension($ConfigPath).ToLower()
+    
+    try {
+        if ($ext -eq '.json') {
+            $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            if ($json.outbounds) {
+                foreach ($outbound in $json.outbounds) {
+                    if ($outbound.server -and $outbound.server -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
+                        return $outbound.server
+                    }
+                    if ($outbound.server -and $outbound.server -match '\.') {
+                        # 域名 → DNS 解析
+                        $ips = Resolve-AddressToIP -Address $outbound.server
+                        if ($ips.Count -gt 0) { return $ips[0] }
+                    }
+                }
+            }
+        } elseif ($ext -eq '.yaml' -or $ext -eq '.yml') {
+            $content = Get-Content $ConfigPath -Raw -Encoding UTF8
+            $lines = $content -split "`n"
+            $inProxy = $false
+            foreach ($line in $lines) {
+                $trimmed = $line.Trim()
+                if ($trimmed -match '^proxies\s*:') {
+                    $inProxy = $true
+                    continue
+                }
+                if ($inProxy -and $trimmed -match '^\s*server\s*:\s*(.+)$') {
+                    $server = $Matches[1].Trim().Trim('"').Trim("'")
+                    if ($server -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
+                        return $server
+                    }
+                    if ($server -match '\.') {
+                        $ips = Resolve-AddressToIP -Address $server
+                        if ($ips.Count -gt 0) { return $ips[0] }
+                    }
+                    break
+                }
+                if ($inProxy -and $trimmed -match '^\S') {
+                    $inProxy = $false
+                }
+            }
+        }
+    } catch {
+        return $null
+    }
+    
+    return $null
+}
+
+# ------------------------------------------------------------
+# Show-NodeMenu: 渲染多节点选择菜单
+# 参数: -ConfigFiles (config_*.json 文件名数组)
+#       -NodeCache (Read-NodeCache 返回的缓存数组)
+#       -CoreName (内核名称，用于标题显示)
+# ------------------------------------------------------------
+function Show-NodeMenu {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string[]]$ConfigFiles,
+        [Parameter(Mandatory=$true)]
+        $NodeCache,
+        [Parameter(Mandatory=$true)]
+        [string]$CoreName
+    )
+    
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "  $CoreName 内核管理" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    
+    for ($i = 0; $i -lt $ConfigFiles.Count; $i++) {
+        $file = $ConfigFiles[$i]
+        $info = $NodeCache | Where-Object { $_.ConfigFile -eq $file } | Select-Object -First 1
+        $countryStr = ""
+        $ipStr = ""
+        if ($info) {
+            $countryStr = "[$($info.Country)]"
+            $ipStr = $info.IP
+        }
+        Write-Host "  $($i+1)) $file  $countryStr  $ipStr" -ForegroundColor Cyan
+    }
+    
+    Write-Host "----------------------------------------" -ForegroundColor DarkGray
+    Write-Host "  U) 更新节点配置" -ForegroundColor Yellow
+    Write-Host "  Q) 退出脚本" -ForegroundColor Red
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+}
+
+# ------------------------------------------------------------
+# Show-NodeUpdateMenu: 显示 ip_X.bat 选择菜单（无配置时的简化版）
+# 参数: -CoreName (内核名称)
+# ------------------------------------------------------------
+function Show-NodeUpdateOnlyMenu {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CoreName
+    )
+    
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "  $CoreName 内核管理" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "  (暂无节点配置文件)" -ForegroundColor DarkGray
+    Write-Host "----------------------------------------" -ForegroundColor DarkGray
+    Write-Host "  U) 更新节点配置 (唯一选项)" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host ""
+}
+
+# ------------------------------------------------------------
+# Invoke-NodeUpdate: 执行 ip_X.bat 并将生成的 config 重命名为 config_X.*、更新缓存
+# 参数: -IPUpdateDir (ip_Update 目录), -CoreDir (内核目录)
+# ------------------------------------------------------------
+function Invoke-NodeUpdate {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$IPUpdateDir,
+        [Parameter(Mandatory=$true)]
+        [string]$CoreDir
+    )
+    
+    if (-not (Test-Path $IPUpdateDir)) {
+        Write-Host "警告: IP更新目录不存在: $IPUpdateDir" -ForegroundColor Yellow
+        Press-AnyKey -Message "按任意键返回..."
+        return
+    }
+    
+    $ipScripts = @()
+    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.bat" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
+    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.ps1" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
+    
+    if ($ipScripts.Count -eq 0) {
+        Write-Host "警告: 目录下未找到任何 .bat 或 .ps1 文件！" -ForegroundColor Yellow
+        Press-AnyKey -Message "按任意键返回..."
+        return
+    }
+    
+    Write-Host ""
+    Write-Host "选择要更新的节点：" -ForegroundColor Yellow
+    Write-Host ""
+    
+    for ($i = 0; $i -lt $ipScripts.Count; $i++) {
+        Write-Host "$($i+1)、$($ipScripts[$i])" -ForegroundColor Cyan
+    }
+    Write-Host "0、跳过更新" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $choice = Read-Host "请选择 [1-$($ipScripts.Count), 0=跳过]"
+    $selectedNum = 0
+    if (-not [int]::TryParse($choice, [ref]$selectedNum)) {
+        Write-Host "跳过更新。" -ForegroundColor Gray
+        return
+    }
+    
+    if ($selectedNum -eq 0) {
+        Write-Host "跳过更新。" -ForegroundColor Gray
+        return
+    }
+    
+    if ($selectedNum -lt 1 -or $selectedNum -gt $ipScripts.Count) {
+        Write-Host "无效选择，跳过更新。" -ForegroundColor Yellow
+        return
+    }
+    
+    $selectedScript = $ipScripts[$selectedNum - 1]
+    $scriptPath = Join-Path $IPUpdateDir $selectedScript
+    
+    Write-Host "正在执行: $selectedScript" -ForegroundColor Cyan
+    
+    $extension = [System.IO.Path]::GetExtension($selectedScript).ToLower()
+    
+    try {
+        $scriptDir = Split-Path $scriptPath -Parent
+        $exitCode = 0
+        
+        if ($extension -eq ".bat") {
+            $tmpOut = [System.IO.Path]::GetTempFileName()
+            $tmpErr = [System.IO.Path]::GetTempFileName()
+            
+            Write-Host "正在下载配置..." -NoNewline
+            
+            $proc = Start-Process -FilePath "cmd.exe" `
+                -ArgumentList "/c `"echo.|`"$scriptPath`"`"" `
+                -WorkingDirectory $scriptDir `
+                -NoNewWindow `
+                -PassThru `
+                -RedirectStandardOutput $tmpOut `
+                -RedirectStandardError $tmpErr
+            
+            $proc.WaitForExit()
+            $exitCode = $proc.ExitCode
+            
+            Remove-Item $tmpOut, $tmpErr -ErrorAction SilentlyContinue
+            Write-Host " 完成" -ForegroundColor Green
+        } elseif ($extension -eq ".ps1") {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "`"$scriptPath`"" 2>&1 | ForEach-Object {
+                Write-Host $_.ToString()
+            }
+            $exitCode = $LASTEXITCODE
+        }
+        
+        if ($exitCode -ne 0) {
+            Write-Host "警告: IP更新脚本执行失败，错误代码: $exitCode" -ForegroundColor Yellow
+            Press-AnyKey -Message "按任意键返回..."
+            return
+        }
+        
+        # === 方案 B: PS 接管，将生成的配置文件重命名为 config_X.* ===
+        $index = ""
+        if ($selectedScript -match 'ip[_\-](\d+)') {
+            $index = $Matches[1]
+        }
+        
+        if (-not $index) {
+            Write-Host "警告: 无法从脚本名提取编号，跳过重命名" -ForegroundColor Yellow
+            Press-AnyKey -Message "按任意键返回..."
+            return
+        }
+        
+        # 检测 bat 生成的文件名（config.json / config.yaml / client.yaml）
+        $generatedFile = $null
+        $ext = $null
+        if (Test-Path (Join-Path $CoreDir "config.json")) {
+            $generatedFile = Join-Path $CoreDir "config.json"
+            $ext = "json"
+        } elseif (Test-Path (Join-Path $CoreDir "config.yaml")) {
+            $generatedFile = Join-Path $CoreDir "config.yaml"
+            $ext = "yaml"
+        } elseif (Test-Path (Join-Path $CoreDir "client.yaml")) {
+            $generatedFile = Join-Path $CoreDir "client.yaml"
+            $ext = "yaml"
+        }
+        
+        if ($generatedFile) {
+            $configNewName = "config_$index.$ext"
+            $configNewPath = Join-Path $CoreDir $configNewName
+            
+            Move-Item -Path $generatedFile -Destination $configNewPath -Force
+            Write-Host "节点配置已保存为: $configNewName" -ForegroundColor Green
+            
+            # 提取 server IP 并查询国家
+            $serverIP = Get-ConfigServerIP -ConfigPath $configNewPath
+            if ($serverIP) {
+                Write-Host "节点服务器: $serverIP" -ForegroundColor Gray
+                $country = Get-IPCountry -IP $serverIP
+                if ($country) {
+                    Write-Host "节点归属地: $country" -ForegroundColor Green
+                    Write-NodeCache -CoreDir $CoreDir -ConfigFile $configNewName -Country $country -IP $serverIP
+                } else {
+                    Write-Host "归属地查询失败" -ForegroundColor Yellow
+                    Write-NodeCache -CoreDir $CoreDir -ConfigFile $configNewName -Country "N/A" -IP $serverIP
+                }
+            } else {
+                Write-Host "未能从配置中提取节点服务器地址" -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "警告: 未找到生成的配置文件 (config.json / config.yaml / client.yaml)" -ForegroundColor Yellow
+        }
+        
+    } catch {
+        Write-Host "执行脚本时出错: $_" -ForegroundColor Red
+    }
+    
+    Write-Host ""
+    Press-AnyKey -Message "按任意键返回菜单..."
+}
+
+# ------------------------------------------------------------
+# Invoke-NodeMenu: 节点管理主菜单 — 替代原 Invoke-IPUpdate 的新入口
+# 扫描内核目录下的 config_*.json / config_*.yaml，提供节点选择、更新、退出
+# 参数: -CoreDir (内核目录名，如 "singbox")
+#       -CoreName (内核显示名称，如 "SingBox")
+# 返回: 用户选择的配置文件名 (如 "config_1.json")，退出则返回 $null
+# ------------------------------------------------------------
+function Invoke-NodeMenu {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$CoreDir,
+        [Parameter(Mandatory=$true)]
+        [string]$CoreName
+    )
+    
+    $coreDirAbs = Join-Path $PSScriptRoot $CoreDir
+    $ipUpdateDir = Join-Path $coreDirAbs "ip_Update"
+    
+    while ($true) {
+        # 扫描内核目录下的 config_*.json 和 config_*.yaml
+        $configFiles = @()
+        $configFiles += Get-ChildItem -Path $coreDirAbs -Filter "config_*.json" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+        $configFiles += Get-ChildItem -Path $coreDirAbs -Filter "config_*.yaml" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name }
+        $configFiles = @($configFiles | Sort-Object)
+        
+        $nodeCache = Read-NodeCache -CoreDir $coreDirAbs
+        
+        if ($configFiles.Count -eq 0) {
+            # 无配置文件 → 仅显示 [U] 更新选项
+            Show-NodeUpdateOnlyMenu -CoreName $CoreName
+            
+            $choice = Read-Host "请选择 [U]"
+            if ($choice -eq 'u' -or $choice -eq 'U') {
+                Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs
+                continue
+            } else {
+                Write-Host "未选择更新，退出。" -ForegroundColor Red
+                return $null
+            }
+        } else {
+            # 有配置文件 → 显示完整菜单
+            Show-NodeMenu -ConfigFiles $configFiles -NodeCache $nodeCache -CoreName $CoreName
+            
+            $choice = Read-Host "请选择操作"
+            
+            # 数字选择 → 返回对应配置文件名
+            if ($choice -match '^\d+$') {
+                $num = [int]$choice
+                if ($num -ge 1 -and $num -le $configFiles.Count) {
+                    return $configFiles[$num - 1]
+                }
+            }
+            
+            # U 更新
+            if ($choice -eq 'u' -or $choice -eq 'U') {
+                Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs
+                continue
+            }
+            
+            # Q 退出
+            if ($choice -eq 'q' -or $choice -eq 'Q') {
+                return $null
+            }
+            
+            Write-Host "无效选择！" -ForegroundColor Red
+        }
+    }
+}
+
+# ------------------------------------------------------------
 # Confirm-Launch: 启动内核前二次确认
 # 参数: -CoreName (内核名称，用于显示)
 #       -TimeoutSeconds (超时秒数，超时后默认确认启动，默认10秒)
