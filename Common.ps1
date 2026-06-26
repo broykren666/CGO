@@ -726,8 +726,106 @@ function Write-NodeCache {
 }
 
 # ------------------------------------------------------------
-# Get-ConfigServerIP: 从配置文件中提取第一个 outbound 的 server 地址
-# 支持 .json 和 .yaml 两种格式
+# Resolve-ServerToIP: 公共助手 — 将 server 字符串解析为 IP 地址
+# 自动处理端口剥离、IPv4、IPv6、域名 DNS 解析
+# 参数: -Server (原始 server 值，可含端口，如 "www.abc.xyz:13377")
+# 返回: IP 地址字符串 或 $null
+# ------------------------------------------------------------
+function Resolve-ServerToIP {
+    param([string]$Server)
+    if (-not $Server) { return $null }
+    $ips = @(Resolve-AddressToIP -Address $Server)
+    if ($ips.Count -gt 0) { return $ips[0] }
+    return $null
+}
+
+# ------------------------------------------------------------
+# Get-ServerIP-Hysteria2: Hysteria / Hysteria2 / NaiveProxy / Juicity
+# 扁平 JSON 结构，server 在根级
+# ------------------------------------------------------------
+function Get-ServerIP-Hysteria2 {
+    param([string]$ConfigPath)
+    try {
+        $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $json.server) { return $null }
+        return Resolve-ServerToIP -Server $json.server
+    } catch { return $null }
+}
+
+# ------------------------------------------------------------
+# Get-ServerIP-SingBox: SingBox 内核
+# JSON 结构，server 在 outbounds[].server
+# ------------------------------------------------------------
+function Get-ServerIP-SingBox {
+    param([string]$ConfigPath)
+    try {
+        $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $json.outbounds) { return $null }
+        foreach ($outbound in $json.outbounds) {
+            if ($outbound.server) {
+                $ip = Resolve-ServerToIP -Server $outbound.server
+                if ($ip) { return $ip }
+            }
+        }
+        return $null
+    } catch { return $null }
+}
+
+# ------------------------------------------------------------
+# Get-ServerIP-Xray: Xray 内核
+# JSON 结构，server 在 outbounds[].settings.vnext[0].address
+# ------------------------------------------------------------
+function Get-ServerIP-Xray {
+    param([string]$ConfigPath)
+    try {
+        $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $json.outbounds) { return $null }
+        foreach ($outbound in $json.outbounds) {
+            if (-not ($outbound.settings -and $outbound.settings.vnext)) { continue }
+            $vnext = $outbound.settings.vnext
+            $vnextItem = if ($vnext -is [array]) { $vnext[0] } else { $vnext }
+            if ($vnextItem.address) {
+                $ip = Resolve-ServerToIP -Server $vnextItem.address
+                if ($ip) { return $ip }
+            }
+        }
+        return $null
+    } catch { return $null }
+}
+
+# ------------------------------------------------------------
+# Get-ServerIP-ClashMeta: Clash.Meta 内核
+# YAML 结构，server 在 proxies: 块下
+# ------------------------------------------------------------
+function Get-ServerIP-ClashMeta {
+    param([string]$ConfigPath)
+    try {
+        $content = Get-Content $ConfigPath -Raw -Encoding UTF8
+        $lines = $content -split "`n"
+        $inProxy = $false
+        foreach ($line in $lines) {
+            $trimmed = $line.Trim()
+            if ($trimmed -match '^proxies\s*:') {
+                $inProxy = $true
+                continue
+            }
+            if ($inProxy -and $trimmed -match '^\s*server\s*:\s*(.+)$') {
+                $server = $Matches[1].Trim().Trim('"').Trim("'")
+                $ip = Resolve-ServerToIP -Server $server
+                if ($ip) { return $ip }
+                return $null
+            }
+            if ($inProxy -and $line -match '^\S') {
+                $inProxy = $false
+            }
+        }
+        return $null
+    } catch { return $null }
+}
+
+# ------------------------------------------------------------
+# Get-ConfigServerIP: 协议分发器
+# 按文件扩展名和 JSON 结构自动分发到对应协议提取函数
 # 参数: -ConfigPath (配置文件路径)
 # 返回: IP 地址字符串，失败返回 $null
 # ------------------------------------------------------------
@@ -741,77 +839,24 @@ function Get-ConfigServerIP {
     
     $ext = [System.IO.Path]::GetExtension($ConfigPath).ToLower()
     
-    try {
-        if ($ext -eq '.json') {
-            $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ($json.outbounds) {
-                foreach ($outbound in $json.outbounds) {
-                    # 通用: outbound.server (singbox 等)
-                    if ($outbound.server -and $outbound.server -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
-                        return $outbound.server
-                    }
-                    # IPv6 (含 : 不含 .)
-                    if ($outbound.server -and $outbound.server -match ':' -and $outbound.server -notmatch '\.') {
-                        return $outbound.server
-                    }
-                    if ($outbound.server -and $outbound.server -match '\.') {
-                        $ips = @(Resolve-AddressToIP -Address $outbound.server)
-                        if ($ips.Count -gt 0) { return $ips[0] }
-                    }
-                    # Xray: settings.vnext[0].address (VLESS/VMess)
-                    if ($outbound.settings -and $outbound.settings.vnext) {
-                        $vnext = $outbound.settings.vnext
-                        $vnextItem = if ($vnext -is [array]) { $vnext[0] } else { $vnext }
-                        if ($vnextItem.address) {
-                            $addr = $vnextItem.address
-                            # IPv4
-                            if ($addr -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') { return $addr }
-                            # IPv6 (含 : 不含 .)
-                            if ($addr -match ':' -and $addr -notmatch '\.') { return $addr }
-                            # 域名 → DNS 解析
-                            if ($addr -match '\.') {
-                                $ips = @(Resolve-AddressToIP -Address $addr)
-                                if ($ips.Count -gt 0) { return $ips[0] }
-                            }
-                        }
-                    }
-                }
-            }
-        } elseif ($ext -eq '.yaml' -or $ext -eq '.yml') {
-            $content = Get-Content $ConfigPath -Raw -Encoding UTF8
-            $lines = $content -split "`n"
-            $inProxy = $false
-            foreach ($line in $lines) {
-                $trimmed = $line.Trim()
-                if ($trimmed -match '^proxies\s*:') {
-                    $inProxy = $true
-                    continue
-                }
-                if ($inProxy -and $trimmed -match '^\s*server\s*:\s*(.+)$') {
-                    $server = $Matches[1].Trim().Trim('"').Trim("'")
-                    # IPv4
-                    if ($server -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
-                        return $server
-                    }
-                    # IPv6 (含 : 不含 .)
-                    if ($server -match ':' -and $server -notmatch '\.') {
-                        return $server
-                    }
-                    # 域名 → DNS 解析
-                    if ($server -match '\.') {
-                        $ips = @(Resolve-AddressToIP -Address $server)
-                        if ($ips.Count -gt 0) { return $ips[0] }
-                    }
-                    break
-                }
-                # 仅当行首无缩进（顶层 YAML key）时才退出 proxies 区域
-                if ($inProxy -and $line -match '^\S') {
-                    $inProxy = $false
-                }
-            }
-        }
-    } catch {
-        return $null
+    # YAML → Clash.Meta
+    if ($ext -eq '.yaml' -or $ext -eq '.yml') {
+        return Get-ServerIP-ClashMeta -ConfigPath $ConfigPath
+    }
+    
+    # JSON → 按特征按序尝试（优先匹配特征最明确的协议）
+    if ($ext -eq '.json') {
+        # 1) 扁平 JSON (Hysteria2 等): 根级 server 字段
+        $ip = Get-ServerIP-Hysteria2 -ConfigPath $ConfigPath
+        if ($ip) { return $ip }
+        
+        # 2) Xray: outbounds[].settings.vnext 结构
+        $ip = Get-ServerIP-Xray -ConfigPath $ConfigPath
+        if ($ip) { return $ip }
+        
+        # 3) SingBox: outbounds[].server 通用结构
+        $ip = Get-ServerIP-SingBox -ConfigPath $ConfigPath
+        if ($ip) { return $ip }
     }
     
     return $null
