@@ -352,7 +352,7 @@ function Get-IPsFromConfig {
     $seenDomains = @{}
     
     foreach ($addr in $rawAddresses) {
-        $ips = Resolve-AddressToIP -Address $addr
+        $ips = @(Resolve-AddressToIP -Address $addr)
         foreach ($ip in $ips) {
             if (-not $seenIPs.ContainsKey($ip)) {
                 $seenIPs[$ip] = $true
@@ -755,7 +755,7 @@ function Get-ConfigServerIP {
                         return $outbound.server
                     }
                     if ($outbound.server -and $outbound.server -match '\.') {
-                        $ips = Resolve-AddressToIP -Address $outbound.server
+                        $ips = @(Resolve-AddressToIP -Address $outbound.server)
                         if ($ips.Count -gt 0) { return $ips[0] }
                     }
                     # Xray: settings.vnext[0].address (VLESS/VMess)
@@ -770,7 +770,7 @@ function Get-ConfigServerIP {
                             if ($addr -match ':' -and $addr -notmatch '\.') { return $addr }
                             # 域名 → DNS 解析
                             if ($addr -match '\.') {
-                                $ips = Resolve-AddressToIP -Address $addr
+                                $ips = @(Resolve-AddressToIP -Address $addr)
                                 if ($ips.Count -gt 0) { return $ips[0] }
                             }
                         }
@@ -789,11 +789,17 @@ function Get-ConfigServerIP {
                 }
                 if ($inProxy -and $trimmed -match '^\s*server\s*:\s*(.+)$') {
                     $server = $Matches[1].Trim().Trim('"').Trim("'")
+                    # IPv4
                     if ($server -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
                         return $server
                     }
+                    # IPv6 (含 : 不含 .)
+                    if ($server -match ':' -and $server -notmatch '\.') {
+                        return $server
+                    }
+                    # 域名 → DNS 解析
                     if ($server -match '\.') {
-                        $ips = Resolve-AddressToIP -Address $server
+                        $ips = @(Resolve-AddressToIP -Address $server)
                         if ($ips.Count -gt 0) { return $ips[0] }
                     }
                     break
