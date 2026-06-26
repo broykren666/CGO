@@ -1043,7 +1043,7 @@ function Execute-SingleNodeUpdate {
 # ------------------------------------------------------------
 # Invoke-NodeUpdate: 执行 ip_X.bat 并将生成的 config 重命名为 config_X.*、更新缓存
 # 参数: -IPUpdateDir (ip_Update 目录), -CoreDir (内核目录)
-#       -NoConfigMode (无配置模式：底部显示 Q 退出而非 0 跳过)
+#       -NoConfigMode (保留兼容，当前已统一为 R 返回)
 # 返回: $true 至少更新了一个节点, $false 用户跳过/退出
 # ------------------------------------------------------------
 function Invoke-NodeUpdate {
@@ -1071,23 +1071,23 @@ function Invoke-NodeUpdate {
         return $false
     }
     
-    Write-Host ""
-    Write-Host "选择要更新的节点：" -ForegroundColor Yellow
-    Write-Host ""
+    # === 标题 ===
+    $coreName = Split-Path $CoreDir -Leaf
+    $title = if ($coreName -match '^.+$') { $coreName } else { "节点" }
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "  $title 节点更新" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
     
     for ($i = 0; $i -lt $ipScripts.Count; $i++) {
-        Write-Host "$($i+1)、$($ipScripts[$i])" -ForegroundColor Cyan
+        Write-Host "  $($i+1))  $($ipScripts[$i])" -ForegroundColor Cyan
     }
-    Write-Host "A、更新全部" -ForegroundColor Magenta
-    if ($NoConfigMode) {
-        Write-Host "Q、退出脚本" -ForegroundColor Red
-    } else {
-        Write-Host "0、跳过更新" -ForegroundColor Cyan
-    }
+    Write-Host "----------------------------------------" -ForegroundColor Gray
+    Write-Host "  A) 更新全部" -ForegroundColor Magenta
+    Write-Host "  R) 返回菜单" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
     
-    $promptSuffix = if ($NoConfigMode) { "A=全部, Q=退出" } else { "A=全部, 0=跳过" }
-    $choice = Read-Host "请选择 [1-$($ipScripts.Count), $promptSuffix]"
+    $choice = Read-Host "请选择 [1-$($ipScripts.Count), A=全部, R=返回]"
     
     # A → 更新全部
     if ($choice -eq 'a' -or $choice -eq 'A') {
@@ -1103,26 +1103,18 @@ function Invoke-NodeUpdate {
         return ($successCount -gt 0)
     }
     
-    # Q → 退出（仅 NoConfigMode）
-    if ($NoConfigMode -and ($choice -eq 'q' -or $choice -eq 'Q')) {
+    # R → 返回
+    if ($choice -eq 'r' -or $choice -eq 'R') {
         return $false
     }
     
     $selectedNum = 0
     if (-not [int]::TryParse($choice, [ref]$selectedNum)) {
-        if ($NoConfigMode) {
-            Write-Host "未选择更新，退出。" -ForegroundColor Red
-            return $false
-        }
         Write-Host "跳过更新。" -ForegroundColor Gray
         return $false
     }
     
     if ($selectedNum -eq 0) {
-        if ($NoConfigMode) {
-            Write-Host "未选择更新，退出。" -ForegroundColor Red
-            return $false
-        }
         Write-Host "跳过更新。" -ForegroundColor Gray
         return $false
     }
