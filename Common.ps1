@@ -851,6 +851,23 @@ function Get-ServerIP-Mieru {
 }
 
 # ------------------------------------------------------------
+# Get-ServerIP-NaiveProxy: NaiveProxy 内核
+# JSON 结构，proxy URL 中包含服务器地址
+# 格式: "https://user:pass@host:port"
+# ------------------------------------------------------------
+function Get-ServerIP-NaiveProxy {
+    param([string]$ConfigPath)
+    try {
+        $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $json.proxy) { return $null }
+        if ($json.proxy -match '@([^:]+)') {
+            return Resolve-ServerToIP -Server $Matches[1]
+        }
+        return $null
+    } catch { return $null }
+}
+
+# ------------------------------------------------------------
 # Get-ConfigServerIP: 协议分发器
 # 按文件扩展名和 JSON 结构自动分发到对应协议提取函数
 # 参数: -ConfigPath (配置文件路径)
@@ -887,6 +904,10 @@ function Get-ConfigServerIP {
         
         # 4) Mieru: profiles[].servers[].ipAddress 结构
         $ip = Get-ServerIP-Mieru -ConfigPath $ConfigPath
+        if ($ip) { return $ip }
+        
+        # 5) NaiveProxy: proxy URL 中提取 @host:port
+        $ip = Get-ServerIP-NaiveProxy -ConfigPath $ConfigPath
         if ($ip) { return $ip }
     }
     
