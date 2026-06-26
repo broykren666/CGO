@@ -746,13 +746,34 @@ function Get-ConfigServerIP {
             $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
             if ($json.outbounds) {
                 foreach ($outbound in $json.outbounds) {
+                    # 通用: outbound.server (singbox 等)
                     if ($outbound.server -and $outbound.server -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') {
                         return $outbound.server
                     }
+                    # IPv6 (含 : 不含 .)
+                    if ($outbound.server -and $outbound.server -match ':' -and $outbound.server -notmatch '\.') {
+                        return $outbound.server
+                    }
                     if ($outbound.server -and $outbound.server -match '\.') {
-                        # 域名 → DNS 解析
                         $ips = Resolve-AddressToIP -Address $outbound.server
                         if ($ips.Count -gt 0) { return $ips[0] }
+                    }
+                    # Xray: settings.vnext[0].address (VLESS/VMess)
+                    if ($outbound.settings -and $outbound.settings.vnext) {
+                        $vnext = $outbound.settings.vnext
+                        $vnextItem = if ($vnext -is [array]) { $vnext[0] } else { $vnext }
+                        if ($vnextItem.address) {
+                            $addr = $vnextItem.address
+                            # IPv4
+                            if ($addr -match '^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$') { return $addr }
+                            # IPv6 (含 : 不含 .)
+                            if ($addr -match ':' -and $addr -notmatch '\.') { return $addr }
+                            # 域名 → DNS 解析
+                            if ($addr -match '\.') {
+                                $ips = Resolve-AddressToIP -Address $addr
+                                if ($ips.Count -gt 0) { return $ips[0] }
+                            }
+                        }
                     }
                 }
             }
