@@ -34,7 +34,7 @@ try {
     }
     $process = Start-Process -FilePath $_corePath -ArgumentList "-c `"$configPath`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
     Wait-CoreStart -Process $process
-    Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Green
+    Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow
     [Console]::ReadKey($true) | Out-Null
 }
 catch {
