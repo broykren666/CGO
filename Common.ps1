@@ -868,6 +868,32 @@ function Get-ServerIP-NaiveProxy {
 }
 
 # ------------------------------------------------------------
+# Get-ServerIP-ShadowQuic: ShadowQuic 内核
+# YAML 结构，server 在 outbound.addr (host:port)
+# ------------------------------------------------------------
+function Get-ServerIP-ShadowQuic {
+    param([string]$ConfigPath)
+    try {
+        $content = Get-Content $ConfigPath -Raw -Encoding UTF8
+        $lines = $content -split "`n"
+        $inOutbound = $false
+        foreach ($line in $lines) {
+            $trimmed = $line.Trim()
+            if ($trimmed -match '^outbound\s*:') {
+                $inOutbound = $true
+                continue
+            }
+            if ($inOutbound -and $trimmed -match '^addr\s*:\s*"([^"]+)"') {
+                $server = ($Matches[1] -replace ':\d+$', '')
+                return Resolve-ServerToIP -Server $server
+            }
+            if ($inOutbound -and $line -match '^\S') { break }
+        }
+        return $null
+    } catch { return $null }
+}
+
+# ------------------------------------------------------------
 # Get-ConfigServerIP: 协议分发器
 # 按文件扩展名和 JSON 结构自动分发到对应协议提取函数
 # 参数: -ConfigPath (配置文件路径)
@@ -883,9 +909,12 @@ function Get-ConfigServerIP {
     
     $ext = [System.IO.Path]::GetExtension($ConfigPath).ToLower()
     
-    # YAML → Clash.Meta
+    # YAML → Clash.Meta / ShadowQuic
     if ($ext -eq '.yaml' -or $ext -eq '.yml') {
-        return Get-ServerIP-ClashMeta -ConfigPath $ConfigPath
+        $ip = Get-ServerIP-ClashMeta -ConfigPath $ConfigPath
+        if ($ip) { return $ip }
+        $ip = Get-ServerIP-ShadowQuic -ConfigPath $ConfigPath
+        if ($ip) { return $ip }
     }
     
     # JSON → 按特征按序尝试（优先匹配特征最明确的协议）
