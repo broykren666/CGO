@@ -7,9 +7,7 @@ $CORE_EXE = "sing-box.exe"
 $CORE_NAME = "SingBox"
 # ======================================================================
 
-try {
-    Show-Banner -Title "SingBox 一键启动脚本"
-    
+try {    
     $_psRoot = "$PSScriptRoot"
     $_coreDir = "$CORE_DIR"
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME

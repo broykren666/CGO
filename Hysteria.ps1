@@ -7,9 +7,7 @@ $CORE_EXE = "hysteria-tun-windows-6.0-386.exe"
 $CORE_NAME = "Hysteria"
 # ======================================================================
 
-try {
-    Show-Banner -Title "Hysteria 一键启动脚本"
-    
+try {   
     $_psRoot = "$PSScriptRoot"
     $_coreDir = "$CORE_DIR"
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME

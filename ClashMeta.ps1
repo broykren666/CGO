@@ -7,9 +7,7 @@ $CORE_EXE = "clash.meta-windows-386.exe"
 $CORE_NAME = "Clash.Meta"
 # ======================================================================
 
-try {
-    Show-Banner -Title "Clash.Meta 一键启动脚本"
-    
+try {  
     $_psRoot = "$PSScriptRoot"
     $_coreDir = "$CORE_DIR"
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME

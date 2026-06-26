@@ -1,5 +1,5 @@
 . "$PSScriptRoot\Common.ps1"
-Initialize-Script -Title "Mieru 一键翻墙" -ScriptPath $PSCommandPath
+Initialize-Script -Title "Mieru 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量（请根据实际情况修改） ====================
 $CORE_DIR = "mieru"
@@ -7,9 +7,7 @@ $CORE_EXE = "mieru.exe"
 $CORE_NAME = "Mieru"
 # ======================================================================
 
-try {
-    Show-Banner -Title "Mieru 一键翻墙脚本"
-    
+try {    
     $_psRoot = "$PSScriptRoot"
     $_coreDir = "$CORE_DIR"
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME

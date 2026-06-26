@@ -1,5 +1,5 @@
 . "$PSScriptRoot\Common.ps1"
-Initialize-Script -Title "Juicity 一键翻墙" -ScriptPath $PSCommandPath
+Initialize-Script -Title "Juicity 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量（请根据实际情况修改） ====================
 $CORE_DIR = "juicity"
@@ -7,9 +7,7 @@ $CORE_EXE = "juicity-client.exe"
 $CORE_NAME = "Juicity"
 # ======================================================================
 
-try {
-    Show-Banner -Title "Juicity 一键翻墙脚本"
-    
+try {   
     # 提前保存路径变量快照，防止 Invoke-NodeMenu 调用后自动变量或脚本变量被意外清空
     $_psRoot = "$PSScriptRoot"
     $_coreDir = "$CORE_DIR"
