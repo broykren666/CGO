@@ -75,10 +75,12 @@ function Test-CoreFile {
         [Parameter(Mandatory=$true)]
         [string]$CoreDir,
         [Parameter(Mandatory=$true)]
-        [string]$CoreExe
+        [string]$CoreExe,
+        [string]$ScriptRoot
     )
 
-    $corePath = Join-Path $PSScriptRoot (Join-Path $CoreDir $CoreExe)
+    if (-not $ScriptRoot) { $ScriptRoot = "$PSScriptRoot" }
+    $corePath = Join-Path $ScriptRoot (Join-Path $CoreDir $CoreExe)
 
     if (-not (Test-Path $corePath)) {
         Write-Host "错误: 内核文件不存在: $CoreExe" -ForegroundColor Red
@@ -1142,9 +1144,10 @@ function Invoke-NodeUpdate {
         return $false
     }
     
-    $ipScripts = @()
-    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.bat" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
-    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.ps1" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
+    # 用 + 运算符替代 += 避免输出流泄漏
+    $batScripts = @(Get-ChildItem -Path $IPUpdateDir -Filter "*.bat" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object)
+    $ps1Scripts = @(Get-ChildItem -Path $IPUpdateDir -Filter "*.ps1" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object)
+    $ipScripts = $batScripts + $ps1Scripts
     
     if ($ipScripts.Count -eq 0) {
         Write-Host "警告: 目录下未找到任何 .bat 或 .ps1 文件！" -ForegroundColor Yellow
@@ -1175,7 +1178,7 @@ function Invoke-NodeUpdate {
         $successCount = 0
         for ($j = 0; $j -lt $ipScripts.Count; $j++) {
             $ok = Execute-SingleNodeUpdate -ScriptName $ipScripts[$j] -IPUpdateDir $IPUpdateDir -CoreDir $CoreDir
-            if ($ok) { $successCount++ }
+            if ($ok) { $successCount = $successCount + 1 }
         }
         Write-Host ""
         Write-Host "全部更新完成: $successCount / $($ipScripts.Count) 个节点成功" -ForegroundColor $(if ($successCount -gt 0) { "Green" } else { "Yellow" })
@@ -1226,10 +1229,12 @@ function Invoke-NodeMenu {
         [Parameter(Mandatory=$true)]
         [string]$CoreDir,
         [Parameter(Mandatory=$true)]
-        [string]$CoreName
+        [string]$CoreName,
+        [string]$ScriptRoot
     )
     
-    $coreDirAbs = Join-Path $PSScriptRoot $CoreDir
+    if (-not $ScriptRoot) { $ScriptRoot = "$PSScriptRoot" }
+    $coreDirAbs = Join-Path $ScriptRoot $CoreDir
     $ipUpdateDir = Join-Path $coreDirAbs "ip_Update"
     
     while ($true) {
@@ -1267,7 +1272,7 @@ function Invoke-NodeMenu {
             # U 更新
             if ($choice -eq 'u' -or $choice -eq 'U') {
                 Clear-Host
-                Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs
+                $null = Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs
                 Clear-Host
                 continue
             }

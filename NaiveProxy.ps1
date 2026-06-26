@@ -7,19 +7,26 @@ $CORE_EXE = "naive.exe"
 $CORE_NAME = "NaiveProxy"
 # ======================================================================
 
-try {    
-    $_psRoot = "$PSScriptRoot"
-    $_coreDir = "$CORE_DIR"
-    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME
-    if ($null -eq $selectedConfig) { Press-AnyKey; exit 0 }
+# 预计算路径 — 用 [IO.Path]::Combine 替代 Join-Path，彻底避免 Clear-Host 后参数绑定异常
+$_workDir = [IO.Path]::Combine($PSScriptRoot, $CORE_DIR)
+$_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)
 
-    $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
+try {    
+    if (-not (Test-Path $_corePath)) {
+        Write-Host "错误: 内核文件不存在: $CORE_EXE ($_corePath)" -ForegroundColor Red
+        Press-AnyKey; exit 1
+    }
+
+    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME -ScriptRoot "$PSScriptRoot"
+    if ($null -eq $selectedConfig -or $selectedConfig -eq '') { Press-AnyKey; exit 0 }
 
     # 启动内核（naiveproxy 参数格式：naive.exe "config.json"）
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
-    $workingDir = Join-Path $_psRoot $_coreDir
-    $configPath = Join-Path $workingDir $selectedConfig
-    $process = Start-Process -FilePath $corePath -ArgumentList "`"$configPath`"" -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
+    $configPath = [IO.Path]::Combine($_workDir, $selectedConfig)
+
+    if (-not (Test-Path $configPath)) { Write-Host "错误: 配置文件不存在 — $configPath" -ForegroundColor Red; Press-AnyKey; exit 1 }
+
+    $process = Start-Process -FilePath $_corePath -ArgumentList "`"$configPath`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
 
     Wait-CoreStart -Process $process
 

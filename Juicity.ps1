@@ -7,21 +7,26 @@ $CORE_EXE = "juicity-client.exe"
 $CORE_NAME = "Juicity"
 # ======================================================================
 
+# 预计算路径 — 用 [IO.Path]::Combine 替代 Join-Path，彻底避免 Clear-Host 后参数绑定异常
+$_workDir = [IO.Path]::Combine($PSScriptRoot, $CORE_DIR)
+$_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)
+
 try {   
-    # 提前保存路径变量快照，防止 Invoke-NodeMenu 调用后自动变量或脚本变量被意外清空
-    $_psRoot = "$PSScriptRoot"
-    $_coreDir = "$CORE_DIR"
+    if (-not (Test-Path $_corePath)) {
+        Write-Host "错误: 内核文件不存在: $CORE_EXE ($_corePath)" -ForegroundColor Red
+        Press-AnyKey; exit 1
+    }
 
-    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME
-    if ($null -eq $selectedConfig) { Press-AnyKey; exit 0 }
-
-    $corePath = Test-CoreFile -CoreDir $_coreDir -CoreExe $CORE_EXE
+    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME -ScriptRoot "$PSScriptRoot"
+    if ($null -eq $selectedConfig -or $selectedConfig -eq '') { Press-AnyKey; exit 0 }
 
     # 启动内核（juicity 参数格式：juicity-client.exe run -c config.json）
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
-    $workingDir = Join-Path $_psRoot $_coreDir
-    $configPath = Join-Path $workingDir $selectedConfig
-    $process = Start-Process -FilePath $corePath -ArgumentList "run -c `"$configPath`"" -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
+    $configPath = [IO.Path]::Combine($_workDir, $selectedConfig)
+
+    if (-not (Test-Path $configPath)) { Write-Host "错误: 配置文件不存在 — $configPath" -ForegroundColor Red; Press-AnyKey; exit 1 }
+
+    $process = Start-Process -FilePath $_corePath -ArgumentList "run -c `"$configPath`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
 
     Wait-CoreStart -Process $process
 

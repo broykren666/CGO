@@ -7,22 +7,29 @@ $CORE_EXE = "clash.meta-windows-386.exe"
 $CORE_NAME = "Clash.Meta"
 # ======================================================================
 
-try {  
-    $_psRoot = "$PSScriptRoot"
-    $_coreDir = "$CORE_DIR"
-    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME
-    if ($null -eq $selectedConfig) { Press-AnyKey; exit 0 }
+# 预计算路径 — 用 [IO.Path]::Combine 替代 Join-Path，彻底避免 Clear-Host 后参数绑定异常
+$_workDir = [IO.Path]::Combine($PSScriptRoot, $CORE_DIR)
+$_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)
 
-    $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
+try {  
+    if (-not (Test-Path $_corePath)) {
+        Write-Host "错误: 内核文件不存在: $CORE_EXE ($_corePath)" -ForegroundColor Red
+        Press-AnyKey; exit 1
+    }
+
+    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME -ScriptRoot "$PSScriptRoot"
+    if ($null -eq $selectedConfig -or $selectedConfig -eq '') { Press-AnyKey; exit 0 }
 
     # 启动内核（clash.meta 使用 -d 指定工作目录，自动读取 config.yaml）
     # 将选中的 config_X.yaml 复制为 config.yaml
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
-    $workingDir = Join-Path $_psRoot $_coreDir
-    $configSrc = Join-Path $workingDir $selectedConfig
-    $configDst = Join-Path $workingDir "config.yaml"
+    $configSrc = [IO.Path]::Combine($_workDir, $selectedConfig)
+    $configDst = [IO.Path]::Combine($_workDir, "config.yaml")
+
+    if (-not (Test-Path $configSrc)) { Write-Host "错误: 配置文件不存在 — $configSrc" -ForegroundColor Red; Press-AnyKey; exit 1 }
+
     Copy-Item -Path $configSrc -Destination $configDst -Force
-    $process = Start-Process -FilePath $corePath -ArgumentList "-d `"$workingDir`"" -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
+    $process = Start-Process -FilePath $_corePath -ArgumentList "-d `"$_workDir`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
 
     Wait-CoreStart -Process $process
 
