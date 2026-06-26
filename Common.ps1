@@ -895,7 +895,7 @@ function Show-NodeMenu {
     }
     
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
-    Write-Host "  U) 更新节点配置" -ForegroundColor Yellow
+    Write-Host "  U) 更新节点" -ForegroundColor Yellow
     Write-Host "  Q) 退出脚本" -ForegroundColor Red
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
@@ -917,7 +917,7 @@ function Show-NodeUpdateOnlyMenu {
     Write-Host "========================================" -ForegroundColor Green
     Write-Host "  (暂无节点配置文件)" -ForegroundColor DarkGray
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
-    Write-Host "  U) 更新节点配置 (唯一选项)" -ForegroundColor Yellow
+    Write-Host "  U) 更新节点 (唯一选项)" -ForegroundColor Yellow
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
 }
@@ -1081,7 +1081,7 @@ function Invoke-NodeUpdate {
     for ($i = 0; $i -lt $ipScripts.Count; $i++) {
         Write-Host "  $($i+1))  $($ipScripts[$i])" -ForegroundColor Cyan
     }
-    Write-Host "----------------------------------------" -ForegroundColor Gray
+    Write-Host "----------------------------------------" -ForegroundColor DarkGray
     Write-Host "  A) 更新全部" -ForegroundColor Magenta
     Write-Host "  R) 返回菜单" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Green
