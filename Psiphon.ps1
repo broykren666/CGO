@@ -1,5 +1,5 @@
 . "$PSScriptRoot\Common.ps1"
-Initialize-Script -Title "Psiphon 一键翻墙" -ScriptPath $PSCommandPath
+Initialize-Script -Title "Psiphon 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量（请根据实际情况修改） ====================
 $CORE_DIR = "psiphon"
@@ -7,13 +7,9 @@ $CORE_EXE = "psiphon3.exe"
 # ======================================================================
 
 try {
-    Show-Banner -Title "Psiphon 一键翻墙脚本"
+    Show-Banner -Title "Psiphon 一键启动"
 
     $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
-
-    if (-not (Confirm-Launch -CoreName "Psiphon ($CORE_EXE)")) {
-        Press-AnyKey; exit 0
-    }
 
     # 启动 psiphon3.exe
     $workingDir = Join-Path $PSScriptRoot $CORE_DIR
