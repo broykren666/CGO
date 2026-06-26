@@ -10,6 +10,8 @@ $CORE_NAME = "Clash.Meta"
 try {
     Show-Banner -Title "Clash.Meta 一键启动脚本"
     
+    $_psRoot = "$PSScriptRoot"
+    $_coreDir = "$CORE_DIR"
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME
     if ($null -eq $selectedConfig) { Press-AnyKey; exit 0 }
 
@@ -18,7 +20,7 @@ try {
     # 启动内核（clash.meta 使用 -d 指定工作目录，自动读取 config.yaml）
     # 将选中的 config_X.yaml 复制为 config.yaml
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
-    $workingDir = Join-Path $PSScriptRoot $CORE_DIR
+    $workingDir = Join-Path $_psRoot $_coreDir
     $configSrc = Join-Path $workingDir $selectedConfig
     $configDst = Join-Path $workingDir "config.yaml"
     Copy-Item -Path $configSrc -Destination $configDst -Force

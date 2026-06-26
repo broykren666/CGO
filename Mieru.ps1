@@ -10,13 +10,15 @@ $CORE_NAME = "Mieru"
 try {
     Show-Banner -Title "Mieru 一键翻墙脚本"
     
+    $_psRoot = "$PSScriptRoot"
+    $_coreDir = "$CORE_DIR"
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME
     if ($null -eq $selectedConfig) { Press-AnyKey; exit 0 }
 
     $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
 
     # 启动内核（mieru 需要先 apply config 再 start，两步操作）
-    $workingDir = Join-Path $PSScriptRoot $CORE_DIR
+    $workingDir = Join-Path $_psRoot $_coreDir
     $configPath = Join-Path $workingDir $selectedConfig
 
     # 第一步：apply config

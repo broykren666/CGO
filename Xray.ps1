@@ -10,6 +10,8 @@ $CORE_NAME = "Xray"
 try {
     Show-Banner -Title "Xray 一键启动脚本"
     
+    $_psRoot = "$PSScriptRoot"
+    $_coreDir = "$CORE_DIR"
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME
     if ($null -eq $selectedConfig) { Press-AnyKey; exit 0 }
 
@@ -17,7 +19,7 @@ try {
 
     # 启动内核
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
-    $workingDir = Join-Path $PSScriptRoot $CORE_DIR
+    $workingDir = Join-Path $_psRoot $_coreDir
     $configPath = Join-Path $workingDir $selectedConfig
     $process = Start-Process -FilePath $corePath -ArgumentList "-c `"$configPath`"" -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
 
