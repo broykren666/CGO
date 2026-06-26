@@ -127,7 +127,7 @@ function Press-AnyKey {
         [string]$Message = "按任意键退出..."
     )
 
-    Write-Host $Message
+    Write-Host $Message -ForegroundColor Yellow
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
@@ -571,15 +571,15 @@ function Show-NodeMenu {
             $countryStr = $info.Country
             $ipStr = $info.IP
         }
-        Write-Host "  $($i+1)) $file  " -ForegroundColor Cyan -NoNewline
+        Write-Host "  [$($i+1)] $file  " -ForegroundColor Cyan -NoNewline
         if ($countryStr) { Write-Host "$countryStr  " -ForegroundColor Magenta -NoNewline }
         if ($ipStr) { Write-Host "$ipStr" -ForegroundColor DarkGray }
         else { Write-Host "" }
     }
     
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
-    Write-Host "  U) 更新节点" -ForegroundColor Yellow
-    Write-Host "  Q) 退出脚本" -ForegroundColor Red
+    Write-Host "  [U] 更新节点" -ForegroundColor Yellow
+    Write-Host "  [Q] 退出脚本" -ForegroundColor Red
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
 }
@@ -742,11 +742,11 @@ function Invoke-NodeUpdate {
     Write-Host "========================================" -ForegroundColor Green
     
     for ($i = 0; $i -lt $ipScripts.Count; $i++) {
-        Write-Host "  $($i+1))  $($ipScripts[$i])" -ForegroundColor Cyan
+        Write-Host "  [$($i+1)]  $($ipScripts[$i])" -ForegroundColor Cyan
     }
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
-    Write-Host "  A) 更新全部" -ForegroundColor Magenta
-    Write-Host "  R) 返回菜单" -ForegroundColor Cyan
+    Write-Host "  [A] 更新全部" -ForegroundColor Yellow
+    Write-Host "  [R] 返回菜单" -ForegroundColor Red
     Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
     
@@ -838,7 +838,7 @@ function Invoke-NodeMenu {
             # 有配置文件 → 显示完整菜单
             Show-NodeMenu -ConfigFiles $configFiles -NodeCache $nodeCache -CoreName $CoreName
             
-            $choice = Read-Host "请选择操作"
+            $choice = Read-Host "请选择操作 [1-$($configFiles.Count), U=更新, Q=退出]"
             
             # 数字选择 → 返回对应配置文件名
             if ($choice -match '^\d+$') {
