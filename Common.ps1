@@ -799,7 +799,7 @@ function Show-NodeMenu {
     param(
         [Parameter(Mandatory=$true)]
         [string[]]$ConfigFiles,
-        [Parameter(Mandatory=$true)]
+        [AllowNull()]
         $NodeCache,
         [Parameter(Mandatory=$true)]
         [string]$CoreName
@@ -812,7 +812,7 @@ function Show-NodeMenu {
     
     for ($i = 0; $i -lt $ConfigFiles.Count; $i++) {
         $file = $ConfigFiles[$i]
-        $info = $NodeCache | Where-Object { $_.ConfigFile -eq $file } | Select-Object -First 1
+        $info = if ($NodeCache) { $NodeCache | Where-Object { $_.ConfigFile -eq $file } | Select-Object -First 1 } else { $null }
         $countryStr = ""
         $ipStr = ""
         if ($info) {
@@ -851,66 +851,28 @@ function Show-NodeUpdateOnlyMenu {
 }
 
 # ------------------------------------------------------------
-# Invoke-NodeUpdate: 执行 ip_X.bat 并将生成的 config 重命名为 config_X.*、更新缓存
-# 参数: -IPUpdateDir (ip_Update 目录), -CoreDir (内核目录)
+# Execute-SingleNodeUpdate: 执行单个 ip_X 脚本并处理生成后的重命名和缓存
+# 参数: -ScriptName (如 "ip_1.bat"), -IPUpdateDir, -CoreDir
+# 返回: $true 成功, $false 失败
 # ------------------------------------------------------------
-function Invoke-NodeUpdate {
+function Execute-SingleNodeUpdate {
     param(
+        [Parameter(Mandatory=$true)]
+        [string]$ScriptName,
         [Parameter(Mandatory=$true)]
         [string]$IPUpdateDir,
         [Parameter(Mandatory=$true)]
         [string]$CoreDir
     )
     
-    if (-not (Test-Path $IPUpdateDir)) {
-        Write-Host "警告: IP更新目录不存在: $IPUpdateDir" -ForegroundColor Yellow
-        Press-AnyKey -Message "按任意键返回..."
-        return
-    }
-    
-    $ipScripts = @()
-    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.bat" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
-    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.ps1" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
-    
-    if ($ipScripts.Count -eq 0) {
-        Write-Host "警告: 目录下未找到任何 .bat 或 .ps1 文件！" -ForegroundColor Yellow
-        Press-AnyKey -Message "按任意键返回..."
-        return
-    }
+    $scriptPath = Join-Path $IPUpdateDir $ScriptName
     
     Write-Host ""
-    Write-Host "选择要更新的节点：" -ForegroundColor Yellow
-    Write-Host ""
+    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
+    Write-Host "  正在执行: $ScriptName" -ForegroundColor Cyan
+    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor DarkGray
     
-    for ($i = 0; $i -lt $ipScripts.Count; $i++) {
-        Write-Host "$($i+1)、$($ipScripts[$i])" -ForegroundColor Cyan
-    }
-    Write-Host "0、跳过更新" -ForegroundColor Cyan
-    Write-Host ""
-    
-    $choice = Read-Host "请选择 [1-$($ipScripts.Count), 0=跳过]"
-    $selectedNum = 0
-    if (-not [int]::TryParse($choice, [ref]$selectedNum)) {
-        Write-Host "跳过更新。" -ForegroundColor Gray
-        return
-    }
-    
-    if ($selectedNum -eq 0) {
-        Write-Host "跳过更新。" -ForegroundColor Gray
-        return
-    }
-    
-    if ($selectedNum -lt 1 -or $selectedNum -gt $ipScripts.Count) {
-        Write-Host "无效选择，跳过更新。" -ForegroundColor Yellow
-        return
-    }
-    
-    $selectedScript = $ipScripts[$selectedNum - 1]
-    $scriptPath = Join-Path $IPUpdateDir $selectedScript
-    
-    Write-Host "正在执行: $selectedScript" -ForegroundColor Cyan
-    
-    $extension = [System.IO.Path]::GetExtension($selectedScript).ToLower()
+    $extension = [System.IO.Path]::GetExtension($ScriptName).ToLower()
     
     try {
         $scriptDir = Split-Path $scriptPath -Parent
@@ -943,21 +905,19 @@ function Invoke-NodeUpdate {
         }
         
         if ($exitCode -ne 0) {
-            Write-Host "警告: IP更新脚本执行失败，错误代码: $exitCode" -ForegroundColor Yellow
-            Press-AnyKey -Message "按任意键返回..."
-            return
+            Write-Host "警告: 脚本执行失败，错误代码: $exitCode" -ForegroundColor Yellow
+            return $false
         }
         
         # === 方案 B: PS 接管，将生成的配置文件重命名为 config_X.* ===
         $index = ""
-        if ($selectedScript -match 'ip[_\-](\d+)') {
+        if ($ScriptName -match 'ip[_\-](\d+)') {
             $index = $Matches[1]
         }
         
         if (-not $index) {
             Write-Host "警告: 无法从脚本名提取编号，跳过重命名" -ForegroundColor Yellow
-            Press-AnyKey -Message "按任意键返回..."
-            return
+            return $false
         }
         
         # 检测 bat 生成的文件名（config.json / config.yaml / client.yaml）
@@ -998,14 +958,115 @@ function Invoke-NodeUpdate {
             }
         } else {
             Write-Host "警告: 未找到生成的配置文件 (config.json / config.yaml / client.yaml)" -ForegroundColor Yellow
+            return $false
         }
         
+        return $true
     } catch {
         Write-Host "执行脚本时出错: $_" -ForegroundColor Red
+        return $false
+    }
+}
+
+# ------------------------------------------------------------
+# Invoke-NodeUpdate: 执行 ip_X.bat 并将生成的 config 重命名为 config_X.*、更新缓存
+# 参数: -IPUpdateDir (ip_Update 目录), -CoreDir (内核目录)
+#       -NoConfigMode (无配置模式：底部显示 Q 退出而非 0 跳过)
+# 返回: $true 至少更新了一个节点, $false 用户跳过/退出
+# ------------------------------------------------------------
+function Invoke-NodeUpdate {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$IPUpdateDir,
+        [Parameter(Mandatory=$true)]
+        [string]$CoreDir,
+        [switch]$NoConfigMode
+    )
+    
+    if (-not (Test-Path $IPUpdateDir)) {
+        Write-Host "警告: IP更新目录不存在: $IPUpdateDir" -ForegroundColor Yellow
+        Press-AnyKey -Message "按任意键返回..."
+        return $false
+    }
+    
+    $ipScripts = @()
+    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.bat" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
+    $ipScripts += Get-ChildItem -Path $IPUpdateDir -Filter "*.ps1" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name } | Sort-Object
+    
+    if ($ipScripts.Count -eq 0) {
+        Write-Host "警告: 目录下未找到任何 .bat 或 .ps1 文件！" -ForegroundColor Yellow
+        Press-AnyKey -Message "按任意键返回..."
+        return $false
     }
     
     Write-Host ""
-    Press-AnyKey -Message "按任意键返回菜单..."
+    Write-Host "选择要更新的节点：" -ForegroundColor Yellow
+    Write-Host ""
+    
+    for ($i = 0; $i -lt $ipScripts.Count; $i++) {
+        Write-Host "$($i+1)、$($ipScripts[$i])" -ForegroundColor Cyan
+    }
+    Write-Host "A、更新全部" -ForegroundColor Magenta
+    if ($NoConfigMode) {
+        Write-Host "Q、退出脚本" -ForegroundColor Red
+    } else {
+        Write-Host "0、跳过更新" -ForegroundColor Cyan
+    }
+    Write-Host ""
+    
+    $promptSuffix = if ($NoConfigMode) { "A=全部, Q=退出" } else { "A=全部, 0=跳过" }
+    $choice = Read-Host "请选择 [1-$($ipScripts.Count), $promptSuffix]"
+    
+    # A → 更新全部
+    if ($choice -eq 'a' -or $choice -eq 'A') {
+        $successCount = 0
+        for ($j = 0; $j -lt $ipScripts.Count; $j++) {
+            $ok = Execute-SingleNodeUpdate -ScriptName $ipScripts[$j] -IPUpdateDir $IPUpdateDir -CoreDir $CoreDir
+            if ($ok) { $successCount++ }
+        }
+        Write-Host ""
+        Write-Host "全部更新完成: $successCount / $($ipScripts.Count) 个节点成功" -ForegroundColor $(if ($successCount -gt 0) { "Green" } else { "Yellow" })
+        Write-Host ""
+        Press-AnyKey -Message "按任意键返回菜单..."
+        return ($successCount -gt 0)
+    }
+    
+    # Q → 退出（仅 NoConfigMode）
+    if ($NoConfigMode -and ($choice -eq 'q' -or $choice -eq 'Q')) {
+        return $false
+    }
+    
+    $selectedNum = 0
+    if (-not [int]::TryParse($choice, [ref]$selectedNum)) {
+        if ($NoConfigMode) {
+            Write-Host "未选择更新，退出。" -ForegroundColor Red
+            return $false
+        }
+        Write-Host "跳过更新。" -ForegroundColor Gray
+        return $false
+    }
+    
+    if ($selectedNum -eq 0) {
+        if ($NoConfigMode) {
+            Write-Host "未选择更新，退出。" -ForegroundColor Red
+            return $false
+        }
+        Write-Host "跳过更新。" -ForegroundColor Gray
+        return $false
+    }
+    
+    if ($selectedNum -lt 1 -or $selectedNum -gt $ipScripts.Count) {
+        Write-Host "无效选择，跳过更新。" -ForegroundColor Yellow
+        return $false
+    }
+    
+    $selectedScript = $ipScripts[$selectedNum - 1]
+    $ok = Execute-SingleNodeUpdate -ScriptName $selectedScript -IPUpdateDir $IPUpdateDir -CoreDir $CoreDir
+    if ($ok) {
+        Write-Host ""
+        Press-AnyKey -Message "按任意键返回菜单..."
+    }
+    return $ok
 }
 
 # ------------------------------------------------------------
@@ -1036,17 +1097,12 @@ function Invoke-NodeMenu {
         $nodeCache = Read-NodeCache -CoreDir $coreDirAbs
         
         if ($configFiles.Count -eq 0) {
-            # 无配置文件 → 仅显示 [U] 更新选项
-            Show-NodeUpdateOnlyMenu -CoreName $CoreName
-            
-            $choice = Read-Host "请选择 [U]"
-            if ($choice -eq 'u' -or $choice -eq 'U') {
-                Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs
-                continue
-            } else {
-                Write-Host "未选择更新，退出。" -ForegroundColor Red
+            # 无配置文件 → 直接展示节点更新菜单（跳过中间页）
+            $updated = Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs -NoConfigMode
+            if (-not $updated) {
                 return $null
             }
+            continue
         } else {
             # 有配置文件 → 显示完整菜单
             Show-NodeMenu -ConfigFiles $configFiles -NodeCache $nodeCache -CoreName $CoreName
