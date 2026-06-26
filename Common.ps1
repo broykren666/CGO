@@ -568,10 +568,13 @@ function Show-NodeMenu {
         $countryStr = ""
         $ipStr = ""
         if ($info) {
-            $countryStr = "[$($info.Country)]"
+            $countryStr = $info.Country
             $ipStr = $info.IP
         }
-        Write-Host "  $($i+1)) $file  $countryStr  $ipStr" -ForegroundColor Cyan
+        Write-Host "  $($i+1)) $file  " -ForegroundColor Cyan -NoNewline
+        if ($countryStr) { Write-Host "$countryStr  " -ForegroundColor Magenta -NoNewline }
+        if ($ipStr) { Write-Host "$ipStr" -ForegroundColor DarkGray }
+        else { Write-Host "" }
     }
     
     Write-Host "----------------------------------------" -ForegroundColor DarkGray
