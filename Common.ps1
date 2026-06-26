@@ -151,8 +151,6 @@ function Wait-CoreStart {
     }
 
     Write-Host ""
-    Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Gray
-    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
 # ------------------------------------------------------------

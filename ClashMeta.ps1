@@ -36,12 +36,8 @@ try {
     Wait-CoreStart -Process $process
     Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Green
     [Console]::ReadKey($true) | Out-Null
-    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
 }
 catch {
     Write-Host "发生错误: $_" -ForegroundColor Red
     Press-AnyKey
-}
-finally {
-    if ($process -and $process.Id) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
 }
