@@ -798,7 +798,8 @@ function Get-ConfigServerIP {
                     }
                     break
                 }
-                if ($inProxy -and $trimmed -match '^\S') {
+                # 仅当行首无缩进（顶层 YAML key）时才退出 proxies 区域
+                if ($inProxy -and $line -match '^\S') {
                     $inProxy = $false
                 }
             }
