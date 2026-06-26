@@ -1,10 +1,32 @@
 # ======================================================================
 # Common.ps1 — 公共函数库
-# 供所有代理启动脚本引用：. "$PSScriptRoot\Common.ps1"
+# 供代理启动脚本引用。启动脚本需先读取 .env 获取 CHROMEGO_PATH，再引用本文件。
 # ======================================================================
 
-# IP 信息查询 API 配置
-$Script:IPINFO_TOKEN = "311cf96f8bbc1b"
+# ------------------------------------------------------------
+# 加载 .env 配置（CHROMEGO_PATH / IPINFO_TOKEN）
+# ------------------------------------------------------------
+$Script:CHROMEGO_PATH = ""
+$Script:IPINFO_TOKEN = ""
+
+$envFile = Join-Path $PSScriptRoot ".env"
+if (Test-Path $envFile) {
+    Get-Content $envFile -Encoding UTF8 | ForEach-Object {
+        $line = $_.Trim()
+        if ($line -and $line -notmatch '^\s*#') {
+            if ($line -match '^\s*([^=]+?)\s*=\s*(.+?)\s*$') {
+                $k = $matches[1].Trim()
+                $v = $matches[2].Trim().Trim('"').Trim("'")
+                if ($k -eq 'CHROMEGO_PATH') { $Script:CHROMEGO_PATH = $v }
+                if ($k -eq 'IPINFO_TOKEN')   { $Script:IPINFO_TOKEN   = $v }
+            }
+        }
+    }
+}
+
+# 回退：.env 不存在时使用默认值
+if (-not $Script:CHROMEGO_PATH) { $Script:CHROMEGO_PATH = "$PSScriptRoot" }
+if (-not $Script:IPINFO_TOKEN)   { $Script:IPINFO_TOKEN   = "311cf96f8bbc1b" }
 
 # ------------------------------------------------------------
 # Ensure-Admin: 检查管理员权限，非管理员则自动提权重启
@@ -39,8 +61,12 @@ function Initialize-Script {
     [Console]::OutputEncoding = [Text.Encoding]::UTF8
     chcp 936 > $null
 
-    # 切换到脚本所在目录
-    Set-Location -Path $PSScriptRoot
+    # 切换到项目根目录（优先 CHROMEGO_PATH，回退 PSScriptRoot）
+    if ($Script:CHROMEGO_PATH) {
+        Set-Location -Path $Script:CHROMEGO_PATH
+    } else {
+        Set-Location -Path $PSScriptRoot
+    }
 
     # 检查管理员权限（若非管理员则自动提权重启）
     Ensure-Admin -ScriptPath $ScriptPath
@@ -79,8 +105,8 @@ function Test-CoreFile {
         [string]$ScriptRoot
     )
 
-    if (-not $ScriptRoot) { $ScriptRoot = "$PSScriptRoot" }
-    $corePath = Join-Path $ScriptRoot (Join-Path $CoreDir $CoreExe)
+    if (-not $ScriptRoot) { $ScriptRoot = if ($Script:CHROMEGO_PATH) { $Script:CHROMEGO_PATH } else { "$PSScriptRoot" } }
+    $corePath = [IO.Path]::Combine($ScriptRoot, $CoreDir, $CoreExe)
 
     if (-not (Test-Path $corePath)) {
         Write-Host "错误: 内核文件不存在: $CoreExe" -ForegroundColor Red
@@ -1233,9 +1259,9 @@ function Invoke-NodeMenu {
         [string]$ScriptRoot
     )
     
-    if (-not $ScriptRoot) { $ScriptRoot = "$PSScriptRoot" }
-    $coreDirAbs = Join-Path $ScriptRoot $CoreDir
-    $ipUpdateDir = Join-Path $coreDirAbs "ip_Update"
+    if (-not $ScriptRoot) { $ScriptRoot = if ($Script:CHROMEGO_PATH) { $Script:CHROMEGO_PATH } else { "$PSScriptRoot" } }
+    $coreDirAbs = [IO.Path]::Combine($ScriptRoot, $CoreDir)
+    $ipUpdateDir = [IO.Path]::Combine($coreDirAbs, "ip_Update")
     
     while ($true) {
         # 扫描内核目录下的 config_*.json 和 config_*.yaml
