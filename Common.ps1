@@ -878,9 +878,8 @@ function Show-NodeMenu {
         [string]$CoreName
     )
     
-    Write-Host ""
     Write-Host "========================================" -ForegroundColor Green
-    Write-Host "  $CoreName 内核管理" -ForegroundColor Green
+    Write-Host "  $CoreName 节点选择" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     
     for ($i = 0; $i -lt $ConfigFiles.Count; $i++) {
@@ -1171,7 +1170,9 @@ function Invoke-NodeMenu {
         
         if ($configFiles.Count -eq 0) {
             # 无配置文件 → 直接展示节点更新菜单（跳过中间页）
+            Clear-Host
             $updated = Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs -NoConfigMode
+            Clear-Host
             if (-not $updated) {
                 return $null
             }
@@ -1192,7 +1193,9 @@ function Invoke-NodeMenu {
             
             # U 更新
             if ($choice -eq 'u' -or $choice -eq 'U') {
+                Clear-Host
                 Invoke-NodeUpdate -IPUpdateDir $ipUpdateDir -CoreDir $coreDirAbs
+                Clear-Host
                 continue
             }
             

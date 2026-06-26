@@ -15,10 +15,6 @@ try {
 
     $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
 
-    if (-not (Confirm-Launch -CoreName "$CORE_NAME ($CORE_EXE)")) {
-        Press-AnyKey; exit 0
-    }
-
     # 启动内核（clash.meta 使用 -d 指定工作目录，自动读取 config.yaml）
     # 将选中的 config_X.yaml 复制为 config.yaml
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan

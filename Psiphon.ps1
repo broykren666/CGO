@@ -11,10 +11,6 @@ try {
 
     $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
 
-    if (-not (Confirm-Launch -CoreName "Psiphon ($CORE_EXE)")) {
-        Press-AnyKey; exit 0
-    }
-
     # 启动 psiphon3.exe
     $workingDir = Join-Path $PSScriptRoot $CORE_DIR
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan

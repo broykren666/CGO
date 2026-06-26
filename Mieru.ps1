@@ -15,10 +15,6 @@ try {
 
     $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
 
-    if (-not (Confirm-Launch -CoreName "$CORE_NAME ($CORE_EXE)")) {
-        Press-AnyKey; exit 0
-    }
-
     # 启动内核（mieru 需要先 apply config 再 start，两步操作）
     $workingDir = Join-Path $PSScriptRoot $CORE_DIR
     $configPath = Join-Path $workingDir $selectedConfig
