@@ -824,6 +824,33 @@ function Get-ServerIP-ClashMeta {
 }
 
 # ------------------------------------------------------------
+# Get-ServerIP-Mieru: Mieru 内核
+# JSON 结构，server 在 profiles[].servers[].ipAddress
+# 兼容 domainName 兜底
+# ------------------------------------------------------------
+function Get-ServerIP-Mieru {
+    param([string]$ConfigPath)
+    try {
+        $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $json.profiles) { return $null }
+        foreach ($profile in $json.profiles) {
+            if (-not $profile.servers) { continue }
+            foreach ($server in $profile.servers) {
+                if ($server.ipAddress) {
+                    $ip = Resolve-ServerToIP -Server $server.ipAddress
+                    if ($ip) { return $ip }
+                }
+                elseif ($server.domainName) {
+                    $ip = Resolve-ServerToIP -Server $server.domainName
+                    if ($ip) { return $ip }
+                }
+            }
+        }
+        return $null
+    } catch { return $null }
+}
+
+# ------------------------------------------------------------
 # Get-ConfigServerIP: 协议分发器
 # 按文件扩展名和 JSON 结构自动分发到对应协议提取函数
 # 参数: -ConfigPath (配置文件路径)
@@ -856,6 +883,10 @@ function Get-ConfigServerIP {
         
         # 3) SingBox: outbounds[].server 通用结构
         $ip = Get-ServerIP-SingBox -ConfigPath $ConfigPath
+        if ($ip) { return $ip }
+        
+        # 4) Mieru: profiles[].servers[].ipAddress 结构
+        $ip = Get-ServerIP-Mieru -ConfigPath $ConfigPath
         if ($ip) { return $ip }
     }
     
