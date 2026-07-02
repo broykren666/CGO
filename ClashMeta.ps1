@@ -3,13 +3,13 @@ $_envScript = Join-Path $PSScriptRoot "_env.ps1"
 if (-not (Test-Path $_envScript)) { $_envScript = Join-Path (Split-Path $PSScriptRoot -Parent) "_env.ps1" }
 . $_envScript
 
-. (Join-Path $env:CHROMEGO_PATH "Common.ps1")
+. (Join-Path $env:CHROMEGO_PATH "_common.ps1")
 Initialize-Script -Title "ClashMeta 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量 ====================
+$CORE_NAME = "ClashMeta[7890]"
 $CORE_DIR = "clash.meta"
 $CORE_EXE = "clash.meta-windows-386.exe"
-$CORE_NAME = "ClashMeta"
 # ======================================================================
 
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
@@ -33,7 +33,7 @@ try {
     $configDst = [IO.Path]::Combine($_workDir, "config.yaml")
     Copy-Item -Path $configSrc -Destination $configDst -Force
     $process = Start-Process -FilePath $_corePath -ArgumentList "-d `"$_workDir`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
-    Wait-CoreStart -Process $process
+    Wait-CoreStart -Process $process -ConfigPath $configDst
     Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow
     [Console]::ReadKey($true) | Out-Null
 }

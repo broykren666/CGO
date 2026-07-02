@@ -3,13 +3,13 @@ $_envScript = Join-Path $PSScriptRoot "_env.ps1"
 if (-not (Test-Path $_envScript)) { $_envScript = Join-Path (Split-Path $PSScriptRoot -Parent) "_env.ps1" }
 . $_envScript
 
-. (Join-Path $env:CHROMEGO_PATH "Common.ps1")
+. (Join-Path $env:CHROMEGO_PATH "_common.ps1")
 Initialize-Script -Title "Mieru 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量 ====================
+$CORE_NAME = "Mieru[3080]"
 $CORE_DIR = "mieru"
 $CORE_EXE = "mieru.exe"
-$CORE_NAME = "Mieru"
 # ======================================================================
 
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
@@ -43,7 +43,7 @@ try {
     # 第二步：start
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
     $process = Start-Process -FilePath $_corePath -ArgumentList "start" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
-    Wait-CoreStart -Process $process
+    Wait-CoreStart -Process $process -ConfigPath $configPath
     Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow
     [Console]::ReadKey($true) | Out-Null
 }

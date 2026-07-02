@@ -1,7 +1,8 @@
-. "$PSScriptRoot\Common.ps1"
+. "$PSScriptRoot\_common.ps1"
 Initialize-Script -Title "Psiphon 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量（请根据实际情况修改） ====================
+$CORE_NAME = "Psiphon3"
 $CORE_DIR = "psiphon"
 $CORE_EXE = "psiphon3.exe"
 # ======================================================================

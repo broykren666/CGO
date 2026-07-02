@@ -132,13 +132,171 @@ function Press-AnyKey {
 }
 
 # ------------------------------------------------------------
+# Get-LocalLANIP: 获取本机局域网 IPv4 地址
+# 返回: IP 地址字符串 (如 "192.168.31.93")，失败返回 $null
+# ------------------------------------------------------------
+function Get-LocalLANIP {
+    try {
+        $ip = (Get-NetIPConfiguration -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPv4DefaultGateway -ne $null -and $_.IPv4Address -ne $null } |
+            Select-Object -First 1).IPv4Address.IPAddress
+        if ($ip) { return $ip }
+    } catch {}
+    return $null
+}
+
+# ------------------------------------------------------------
+# Get-ConfigLocalPort: 从配置文件中提取本地监听端口及协议类型
+# 参数: -ConfigPath (配置文件路径)
+# 返回: @(@{Port=1080; Type="mixed"}, ...) 数组，Type 为 "mixed"/"socks"/"http"
+#       失败返回空数组
+# ------------------------------------------------------------
+function Get-ConfigLocalPort {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$ConfigPath
+    )
+
+    $results = @()
+
+    if (-not (Test-Path $ConfigPath)) { return $results }
+
+    $ext = [System.IO.Path]::GetExtension($ConfigPath).ToLower()
+
+    if ($ext -eq '.json') {
+        try {
+            $json = Get-Content $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        } catch { return $results }
+
+        # 1) SingBox: inbounds[].listen_port + inbounds[].type
+        if ($json.inbounds) {
+            foreach ($inbound in $json.inbounds) {
+                if ($inbound.listen_port) {
+                    $portType = $inbound.type
+                    if ($portType -eq 'mixed') {
+                        $results += [PSCustomObject]@{ Port = [int]$inbound.listen_port; Type = 'mixed' }
+                    } elseif ($portType -eq 'socks') {
+                        $results += [PSCustomObject]@{ Port = [int]$inbound.listen_port; Type = 'socks' }
+                    } elseif ($portType -eq 'http') {
+                        $results += [PSCustomObject]@{ Port = [int]$inbound.listen_port; Type = 'http' }
+                    }
+                }
+            }
+        }
+
+        # 2) Hysteria / Hysteria2: socks5.listen → "127.0.0.1:1080"
+        if ($json.socks5 -and $json.socks5.listen) {
+            $port = _Extract-PortFromAddr $json.socks5.listen
+            if ($port) { $results += [PSCustomObject]@{ Port = $port; Type = 'socks' } }
+        }
+
+        # 3) Xray: inbounds[].port + inbounds[].protocol
+        #    （与 SingBox 的 inbounds 结构不同，Xray 用 protocol 字段和 port 字段）
+        if ($json.inbounds -and $results.Count -eq 0) {
+            foreach ($inbound in $json.inbounds) {
+                if ($inbound.port -and $inbound.protocol) {
+                    $proto = $inbound.protocol.ToLower()
+                    if ($proto -eq 'socks') {
+                        $results += [PSCustomObject]@{ Port = [int]$inbound.port; Type = 'socks' }
+                    } elseif ($proto -eq 'http') {
+                        $results += [PSCustomObject]@{ Port = [int]$inbound.port; Type = 'http' }
+                    }
+                }
+            }
+        }
+
+        # 4) Mieru: socks5Port
+        if ($json.socks5Port) {
+            $results += [PSCustomObject]@{ Port = [int]$json.socks5Port; Type = 'socks' }
+        }
+
+        # 5) NaiveProxy: listen → "socks://127.0.0.1:1080"
+        if ($json.listen -and $results.Count -eq 0) {
+            $listenVal = $json.listen.ToString()
+            if ($listenVal -match 'socks://') {
+                $port = _Extract-PortFromAddr $listenVal
+                if ($port) { $results += [PSCustomObject]@{ Port = $port; Type = 'socks' } }
+            } elseif ($listenVal -match 'http://') {
+                $port = _Extract-PortFromAddr $listenVal
+                if ($port) { $results += [PSCustomObject]@{ Port = $port; Type = 'http' } }
+            }
+        }
+
+        # 6) Juicity: listen → "127.0.0.1:1080" (无 socks5 子对象)
+        if ($json.listen -and $results.Count -eq 0 -and -not ($json.socks5)) {
+            $port = _Extract-PortFromAddr $json.listen
+            if ($port) { $results += [PSCustomObject]@{ Port = $port; Type = 'socks' } }
+        }
+
+    } elseif ($ext -eq '.yaml' -or $ext -eq '.yml') {
+        try {
+            $content = Get-Content $ConfigPath -Raw -Encoding UTF8
+        } catch { return $results }
+
+        $lines = $content -split "`n"
+
+        # ClashMeta: mixed-port / port / socks-port (仅匹配顶层字段，无缩进)
+        foreach ($line in $lines) {
+            if ($line -match '^mixed-port\s*:\s*(\d+)') {
+                $results += [PSCustomObject]@{ Port = [int]$Matches[1]; Type = 'mixed' }
+            } elseif ($line -match '^socks-port\s*:\s*(\d+)') {
+                $results += [PSCustomObject]@{ Port = [int]$Matches[1]; Type = 'socks' }
+            } elseif ($line -match '^port\s*:\s*(\d+)') {
+                $results += [PSCustomObject]@{ Port = [int]$Matches[1]; Type = 'http' }
+            }
+        }
+
+        # ShadowQuic: inbound.bind-addr → "127.0.0.1:4080"
+        if ($results.Count -eq 0) {
+            $inOutbound = $false
+            foreach ($line in $lines) {
+                $trimmed = $line.Trim()
+                if ($trimmed -match '^inbound\s*:') { $inOutbound = $true; continue }
+                if ($inOutbound -and $trimmed -match '^bind-addr\s*:\s*"?([^"]+)"?') {
+                    $port = _Extract-PortFromAddr $Matches[1]
+                    if ($port) { $results += [PSCustomObject]@{ Port = $port; Type = 'socks' } }
+                    break
+                }
+                if ($inOutbound -and $line -match '^\S') { $inOutbound = $false }
+            }
+        }
+    }
+
+    return $results
+}
+
+# ------------------------------------------------------------
+# _Extract-PortFromAddr: 从地址字符串中提取端口号
+# 支持: "127.0.0.1:1080" / "socks://127.0.0.1:1080" / "[::1]:1080"
+# 返回: 端口号(int)，失败返回 $null
+# ------------------------------------------------------------
+function _Extract-PortFromAddr {
+    param([string]$Addr)
+
+    if (-not $Addr) { return $null }
+
+    # 去掉协议前缀
+    $clean = $Addr -replace '^[a-zA-Z][a-zA-Z0-9+.-]*://', ''
+
+    # IPv6 [::]:port
+    if ($clean -match '\]:(\d+)$') { return [int]$Matches[1] }
+
+    # IPv4 host:port
+    if ($clean -match ':(\d+)$') { return [int]$Matches[1] }
+
+    return $null
+}
+
+# ------------------------------------------------------------
 # Wait-CoreStart: 等待内核启动并检查进程状态
 # 参数: -Process (Start-Process 返回的进程对象)
+#       -ConfigPath (可选，配置文件路径，用于提取端口信息)
 # ------------------------------------------------------------
 function Wait-CoreStart {
     param(
         [Parameter(Mandatory=$true)]
-        $Process
+        $Process,
+        [string]$ConfigPath
     )
 
     # 等待一下确保启动
@@ -146,8 +304,55 @@ function Wait-CoreStart {
 
     if ($Process.HasExited) {
         Write-Host "警告: 内核可能启动失败，进程已退出。" -ForegroundColor Yellow
+        Write-Host ""
+        return
+    }
+
+    # 提取端口信息
+    $portStr = ""
+    $proxyAddrs = @()
+    if ($ConfigPath -and (Test-Path $ConfigPath)) {
+        $ports = Get-ConfigLocalPort -ConfigPath $ConfigPath
+        if ($ports -and $ports.Count -gt 0) {
+            # 去重（同一 Port+Type 可能因配置文件内容重复而出现多次）
+            $ports = @($ports | Group-Object { "$($_.Port)-$($_.Type)" } | ForEach-Object { $_.Group[0] })
+
+            # 端口号字符串
+            $portStr = ($ports | ForEach-Object { $_.Port } | Select-Object -Unique) -join ', '
+
+            # 构建代理地址列表
+            $lanIP = Get-LocalLANIP
+            foreach ($p in $ports) {
+                if ($p.Type -eq 'mixed') {
+                    if ($lanIP) {
+                        $proxyAddrs += "http://${lanIP}:$($p.Port)"
+                        $proxyAddrs += "socks://${lanIP}:$($p.Port)"
+                    }
+                    $proxyAddrs += "http://127.0.0.1:$($p.Port)"
+                    $proxyAddrs += "socks://127.0.0.1:$($p.Port)"
+                } elseif ($p.Type -eq 'socks') {
+                    if ($lanIP) { $proxyAddrs += "socks://${lanIP}:$($p.Port)" }
+                    $proxyAddrs += "socks://127.0.0.1:$($p.Port)"
+                } elseif ($p.Type -eq 'http') {
+                    if ($lanIP) { $proxyAddrs += "http://${lanIP}:$($p.Port)" }
+                    $proxyAddrs += "http://127.0.0.1:$($p.Port)"
+                }
+            }
+        }
+    }
+
+    # 显示启动信息
+    if ($portStr) {
+        Write-Host "内核已启动 (PID: $($Process.Id) PORT: $portStr)" -ForegroundColor Green
     } else {
         Write-Host "内核已启动 (PID: $($Process.Id))" -ForegroundColor Green
+    }
+
+    if ($proxyAddrs.Count -gt 0) {
+        Write-Host "代理地址：" -ForegroundColor Cyan
+        foreach ($addr in $proxyAddrs) {
+            Write-Host "  $addr" -ForegroundColor Gray
+        }
     }
 
     Write-Host ""

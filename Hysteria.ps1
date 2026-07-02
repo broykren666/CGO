@@ -3,13 +3,13 @@ $_envScript = Join-Path $PSScriptRoot "_env.ps1"
 if (-not (Test-Path $_envScript)) { $_envScript = Join-Path (Split-Path $PSScriptRoot -Parent) "_env.ps1" }
 . $_envScript
 
-. (Join-Path $env:CHROMEGO_PATH "Common.ps1")
+. (Join-Path $env:CHROMEGO_PATH "_common.ps1")
 Initialize-Script -Title "Hysteria 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量 ====================
+$CORE_NAME = "Hysteria"
 $CORE_DIR = "hysteria"
 $CORE_EXE = "hysteria-tun-windows-6.0-386.exe"
-$CORE_NAME = "Hysteria"
 # ======================================================================
 
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
@@ -31,7 +31,7 @@ try {
         Press-AnyKey; exit 1
     }
     $process = Start-Process -FilePath $_corePath -ArgumentList "-c `"$configPath`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
-    Wait-CoreStart -Process $process
+    Wait-CoreStart -Process $process -ConfigPath $configPath
     Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow
     [Console]::ReadKey($true) | Out-Null
 }
