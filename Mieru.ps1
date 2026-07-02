@@ -7,7 +7,7 @@ if (-not (Test-Path $_envScript)) { $_envScript = Join-Path (Split-Path $PSScrip
 Initialize-Script -Title "Mieru 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量 ====================
-$CORE_NAME = "Mieru[3080]"
+$CORE_NAME = "Mieru"
 $CORE_DIR = "mieru"
 $CORE_EXE = "mieru.exe"
 # ======================================================================

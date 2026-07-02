@@ -7,7 +7,7 @@ if (-not (Test-Path $_envScript)) { $_envScript = Join-Path (Split-Path $PSScrip
 Initialize-Script -Title "ShadowQuic 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量 ====================
-$CORE_NAME = "ShadowQuic[4080]"
+$CORE_NAME = "ShadowQuic"
 $CORE_DIR = "shadowquic"
 $CORE_EXE = "shadowquic.exe"
 # ======================================================================

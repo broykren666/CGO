@@ -7,7 +7,7 @@ if (-not (Test-Path $_envScript)) { $_envScript = Join-Path (Split-Path $PSScrip
 Initialize-Script -Title "ClashMeta 一键启动" -ScriptPath $PSCommandPath
 
 # ==================== 配置常量 ====================
-$CORE_NAME = "ClashMeta[7890]"
+$CORE_NAME = "ClashMeta"
 $CORE_DIR = "clash.meta"
 $CORE_EXE = "clash.meta-windows-386.exe"
 # ======================================================================
