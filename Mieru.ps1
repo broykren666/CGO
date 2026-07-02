@@ -32,7 +32,7 @@ try {
     }
 
     # 第一步：apply config
-    Write-Host "正在应用配置 $configPath ..." -ForegroundColor Cyan
+    Write-Host "当前配置 $configPath" -ForegroundColor Yellow
     $applyResult = & $_corePath apply config $configPath 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "配置应用失败:" -ForegroundColor Red
@@ -41,7 +41,7 @@ try {
     }
 
     # 第二步：start
-    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
+    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
     $process = Start-Process -FilePath $_corePath -ArgumentList "start" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
     Wait-CoreStart -Process $process -ConfigPath $configPath -CoreExeName "mieru"
     Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow

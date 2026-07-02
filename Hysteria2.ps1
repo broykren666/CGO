@@ -24,12 +24,13 @@ try {
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME -ScriptRoot $env:CHROMEGO_PATH
     if ($null -eq $selectedConfig -or $selectedConfig -eq '') { Press-AnyKey; exit 0 }
 
-    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
     $configPath = [IO.Path]::Combine($_workDir, $selectedConfig)
     if (-not (Test-Path $configPath)) {
         Write-Host "错误: 配置文件不存在 — $configPath" -ForegroundColor Red
         Press-AnyKey; exit 1
     }
+    Write-Host "当前配置 $configPath" -ForegroundColor Yellow
+    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
     $process = Start-Process -FilePath $_corePath -ArgumentList "-c `"$configPath`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
     Wait-CoreStart -Process $process -ConfigPath $configPath
     Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow

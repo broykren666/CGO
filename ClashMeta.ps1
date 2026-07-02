@@ -24,12 +24,13 @@ try {
     $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME -ScriptRoot $env:CHROMEGO_PATH
     if ($null -eq $selectedConfig -or $selectedConfig -eq '') { Press-AnyKey; exit 0 }
 
-    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
     $configSrc = [IO.Path]::Combine($_workDir, $selectedConfig)
     if (-not (Test-Path $configSrc)) {
         Write-Host "错误: 配置文件不存在 — $configSrc" -ForegroundColor Red
         Press-AnyKey; exit 1
     }
+    Write-Host "当前配置 $configSrc" -ForegroundColor Yellow
+    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
     $configDst = [IO.Path]::Combine($_workDir, "config.yaml")
     Copy-Item -Path $configSrc -Destination $configDst -Force
     $process = Start-Process -FilePath $_corePath -ArgumentList "-d `"$_workDir`"" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru

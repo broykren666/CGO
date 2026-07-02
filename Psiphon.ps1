@@ -14,7 +14,7 @@ try {
 
     # 启动 psiphon3.exe
     $workingDir = Join-Path $PSScriptRoot $CORE_DIR
-    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
+    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
     $process = Start-Process -FilePath $corePath -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
 
     Write-Host "start..." -ForegroundColor Gray
