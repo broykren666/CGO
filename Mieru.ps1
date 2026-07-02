@@ -43,7 +43,7 @@ try {
     # 第二步：start
     Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Cyan
     $process = Start-Process -FilePath $_corePath -ArgumentList "start" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
-    Wait-CoreStart -Process $process -ConfigPath $configPath
+    Wait-CoreStart -Process $process -ConfigPath $configPath -CoreExeName "mieru"
     Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow
     [Console]::ReadKey($true) | Out-Null
 }

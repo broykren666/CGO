@@ -291,18 +291,32 @@ function _Extract-PortFromAddr {
 # Wait-CoreStart: 等待内核启动并检查进程状态
 # 参数: -Process (Start-Process 返回的进程对象)
 #       -ConfigPath (可选，配置文件路径，用于提取端口信息)
+#       -CoreExeName (可选，守护进程名，当 Process.HasExited 但该进程仍在运行时视为成功)
 # ------------------------------------------------------------
 function Wait-CoreStart {
     param(
         [Parameter(Mandatory=$true)]
         $Process,
-        [string]$ConfigPath
+        [string]$ConfigPath,
+        [string]$CoreExeName
     )
 
     # 等待一下确保启动
     Start-Sleep -Seconds 2
 
-    if ($Process.HasExited) {
+    $procId = $Process.Id
+    $isRunning = -not $Process.HasExited
+
+    # 守护进程模式：初始进程退出，但后台守护仍在运行
+    if (-not $isRunning -and $CoreExeName) {
+        $daemon = Get-Process -Name $CoreExeName -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($daemon) {
+            $isRunning = $true
+            $procId = $daemon.Id
+        }
+    }
+
+    if (-not $isRunning) {
         Write-Host "警告: 内核可能启动失败，进程已退出。" -ForegroundColor Yellow
         Write-Host ""
         return
@@ -344,9 +358,9 @@ function Wait-CoreStart {
 
     # 显示启动信息
     if ($portStr) {
-        Write-Host "内核已启动 (PID: $($Process.Id) PORT: $portStr)" -ForegroundColor Green
+        Write-Host "内核已启动 (PID: $procId PORT: $portStr)" -ForegroundColor Green
     } else {
-        Write-Host "内核已启动 (PID: $($Process.Id))" -ForegroundColor Green
+        Write-Host "内核已启动 (PID: $procId)" -ForegroundColor Green
     }
 
     if ($localAddrs.Count -gt 0) {
