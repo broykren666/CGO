@@ -310,7 +310,8 @@ function Wait-CoreStart {
 
     # 提取端口信息
     $portStr = ""
-    $proxyAddrs = @()
+    $localAddrs = @()
+    $lanAddrs = @()
     if ($ConfigPath -and (Test-Path $ConfigPath)) {
         $ports = Get-ConfigLocalPort -ConfigPath $ConfigPath
         if ($ports -and $ports.Count -gt 0) {
@@ -320,22 +321,22 @@ function Wait-CoreStart {
             # 端口号字符串
             $portStr = ($ports | ForEach-Object { $_.Port } | Select-Object -Unique) -join ', '
 
-            # 构建代理地址列表
+            # 构建代理地址列表（本地优先，局域网其次）
             $lanIP = Get-LocalLANIP
             foreach ($p in $ports) {
                 if ($p.Type -eq 'mixed') {
+                    $localAddrs += "http://127.0.0.1:$($p.Port)"
+                    $localAddrs += "socks://127.0.0.1:$($p.Port)"
                     if ($lanIP) {
-                        $proxyAddrs += "http://${lanIP}:$($p.Port)"
-                        $proxyAddrs += "socks://${lanIP}:$($p.Port)"
+                        $lanAddrs += "http://${lanIP}:$($p.Port)"
+                        $lanAddrs += "socks://${lanIP}:$($p.Port)"
                     }
-                    $proxyAddrs += "http://127.0.0.1:$($p.Port)"
-                    $proxyAddrs += "socks://127.0.0.1:$($p.Port)"
                 } elseif ($p.Type -eq 'socks') {
-                    if ($lanIP) { $proxyAddrs += "socks://${lanIP}:$($p.Port)" }
-                    $proxyAddrs += "socks://127.0.0.1:$($p.Port)"
+                    $localAddrs += "socks://127.0.0.1:$($p.Port)"
+                    if ($lanIP) { $lanAddrs += "socks://${lanIP}:$($p.Port)" }
                 } elseif ($p.Type -eq 'http') {
-                    if ($lanIP) { $proxyAddrs += "http://${lanIP}:$($p.Port)" }
-                    $proxyAddrs += "http://127.0.0.1:$($p.Port)"
+                    $localAddrs += "http://127.0.0.1:$($p.Port)"
+                    if ($lanIP) { $lanAddrs += "http://${lanIP}:$($p.Port)" }
                 }
             }
         }
@@ -348,9 +349,16 @@ function Wait-CoreStart {
         Write-Host "内核已启动 (PID: $($Process.Id))" -ForegroundColor Green
     }
 
-    if ($proxyAddrs.Count -gt 0) {
-        Write-Host "代理地址：" -ForegroundColor Cyan
-        foreach ($addr in $proxyAddrs) {
+    if ($localAddrs.Count -gt 0) {
+        Write-Host "本地代理：" -ForegroundColor Cyan
+        foreach ($addr in $localAddrs) {
+            Write-Host "  $addr" -ForegroundColor Gray
+        }
+    }
+
+    if ($lanAddrs.Count -gt 0) {
+        Write-Host "局域网代理：" -ForegroundColor Cyan
+        foreach ($addr in $lanAddrs) {
             Write-Host "  $addr" -ForegroundColor Gray
         }
     }
