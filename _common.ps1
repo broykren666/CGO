@@ -200,6 +200,8 @@ function Get-ConfigLocalPort {
                         $results += [PSCustomObject]@{ Port = [int]$inbound.port; Type = 'socks' }
                     } elseif ($proto -eq 'http') {
                         $results += [PSCustomObject]@{ Port = [int]$inbound.port; Type = 'http' }
+                    } elseif ($proto -eq 'mixed') {
+                        $results += [PSCustomObject]@{ Port = [int]$inbound.port; Type = 'mixed' }
                     }
                 }
             }
