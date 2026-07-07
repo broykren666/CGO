@@ -487,9 +487,9 @@ if ($allFiles.Count -eq 0) {
 # ============================================================
 
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║        ToSBNode - 节点配置转换工具                    ║" -ForegroundColor Cyan
-Write-Host "╚══════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "             ToSBNode - 节点配置转换工具                 " -ForegroundColor Cyan
+Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 
 $globalCount = 0
@@ -497,16 +497,17 @@ foreach ($srcName in $sources.Keys) {
     $srcFiles = $allFiles | Where-Object { $_.Source -eq $srcName }
     if ($srcFiles.Count -eq 0) { continue }
     Write-Host " [$srcName]  ($($srcFiles.Count) 个文件)" -ForegroundColor Yellow
-    Write-Host " ├─ 目录: $($sources[$srcName].Dir)" -ForegroundColor DarkGray
+    Write-Host " ├─ $($sources[$srcName].Dir)" -ForegroundColor DarkGray
     foreach ($f in $srcFiles) {
         $globalCount++
-        Write-Host " │  $globalCount. $($f.FileName)" -ForegroundColor White
+        Write-Host " │  " -ForegroundColor DarkGray -NoNewline
+        Write-Host "$($f.FileName)" -ForegroundColor White
     }
     Write-Host " └─" -ForegroundColor DarkGray
 }
 Write-Host ""
-Write-Host " 输出目录: $([IO.Path]::Combine($ProjectRoot, 'ToSBNode'))" -ForegroundColor DarkGray
-Write-Host " 总计: $globalCount 个文件待转换" -ForegroundColor Green
+Write-Host " 输出目录: $([IO.Path]::Combine($ProjectRoot, 'ToSBNode'))" -ForegroundColor Green
+Write-Host " 文件总计: $globalCount 个文件待转换" -ForegroundColor Green
 Write-Host ""
 
 # ============================================================
@@ -745,6 +746,6 @@ Write-Host "══════════════════════�
 Write-Host "  转换完成!" -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host "  成功: $okCount  失败: $failCount  总计: $($okCount + $failCount)" -ForegroundColor $(if ($failCount -gt 0) { "Yellow" } else { "Green" })
-Write-Host "  输出目录: $outDir" -ForegroundColor White
+Write-Host "  输出目录: $outDir" -ForegroundColor Green
 Write-Host ""
 $null = Read-Host "按回车键退出..."
