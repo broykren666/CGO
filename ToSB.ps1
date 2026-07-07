@@ -305,7 +305,7 @@ data = docs[0]
 proxies = data.get('proxies', [])
 
 # 只保留 SingBox 支持的协议类型
-supported = {'hysteria', 'hysteria2', 'tuic'}
+supported = {'hysteria', 'hysteria2', 'tuic', 'anytls'}
 filtered = [p for p in proxies if p.get('type', '') in supported]
 print(json.dumps(filtered, ensure_ascii=False))
 "@
@@ -387,6 +387,28 @@ print(json.dumps(filtered, ensure_ascii=False))
                 }
             }
             # ALPN
+            if ($proxy.alpn) {
+                if ($proxy.alpn -is [array]) {
+                    $outbound.tls.alpn = @($proxy.alpn)
+                } else {
+                    $outbound.tls.alpn = @($proxy.alpn.ToString())
+                }
+            }
+        }
+        'anytls' {
+            $tag = New-NodeTag -Protocol "anytls-cm" -Server $proxy.server -Port $proxy.port
+            $outbound = [ordered]@{
+                type        = "anytls"
+                tag         = $tag
+                server      = $proxy.server
+                server_port = [int]$proxy.port
+                password    = $proxy.password
+                tls         = [ordered]@{
+                    enabled     = $true
+                    server_name = $proxy.sni
+                    insecure    = [bool]$proxy.'skip-cert-verify'
+                }
+            }
             if ($proxy.alpn) {
                 if ($proxy.alpn -is [array]) {
                     $outbound.tls.alpn = @($proxy.alpn)
