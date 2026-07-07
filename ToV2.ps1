@@ -1,9 +1,10 @@
 ﻿# ToV2.ps1
 # 将支持的节点配置转换为 v2rayN 客户端导入分享链接格式
-# 输出到 ToV2/v2rayNURL.txt，生成 map.log 映射日志
+# 输出目录由 $Script:OutputDirName 变量控制（默认 "ToV2"）
 param([switch]$Yes)
 
 $ErrorActionPreference = "Stop"
+$Script:OutputDirName = "ToV2"          # 输出目录名，改这里即可
 $script:PythonExe = $null
 
 # ============================================================
@@ -612,8 +613,8 @@ foreach ($name in $unsupportedSources.Keys) {
 }
 
 Write-Host ""
-Write-Host " 输出文件: $([IO.Path]::Combine($ProjectRoot, 'ToV2', 'v2rayNURL.txt'))" -ForegroundColor Green
-Write-Host " 映射日志: $([IO.Path]::Combine($ProjectRoot, 'ToV2', 'map.log'))" -ForegroundColor Green
+Write-Host " 输出文件: $([IO.Path]::Combine($ProjectRoot, $Script:OutputDirName, 'v2rayNURL.txt'))" -ForegroundColor Green
+Write-Host " 映射日志: $([IO.Path]::Combine($ProjectRoot, $Script:OutputDirName, 'map.log'))" -ForegroundColor Green
 Write-Host " 文件总计: $globalCount 个文件待转换" -ForegroundColor Green
 
 if ($globalCount -eq 0) {
@@ -642,7 +643,7 @@ if ($confirm -ne '' -and $confirm -ne 'y' -and $confirm -ne 'Y') {
 # 8. 执行转换
 # ============================================================
 
-$outDir = [IO.Path]::Combine($ProjectRoot, "ToV2")
+$outDir = [IO.Path]::Combine($ProjectRoot, $Script:OutputDirName)
 
 # 创建输出目录
 if (Test-Path $outDir) {
