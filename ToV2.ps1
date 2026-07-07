@@ -613,7 +613,7 @@ foreach ($name in $unsupportedSources.Keys) {
 }
 
 Write-Host ""
-Write-Host " 输出文件: $([IO.Path]::Combine($ProjectRoot, $Script:OutputDirName, 'v2rayNURL.txt'))" -ForegroundColor Green
+Write-Host " 输出文件: $([IO.Path]::Combine($ProjectRoot, $Script:OutputDirName, 'v2-url.txt'))" -ForegroundColor Green
 Write-Host " 映射日志: $([IO.Path]::Combine($ProjectRoot, $Script:OutputDirName, 'map.log'))" -ForegroundColor Green
 Write-Host " 文件总计: $globalCount 个文件待转换" -ForegroundColor Green
 
@@ -704,27 +704,27 @@ foreach ($f in $allFiles) {
 }
 
 # ============================================================
-# 9. 写入 v2rayNURL.txt
+# 9. 写入 v2-url.txt
 # ============================================================
 
-$urlFilePath = [IO.Path]::Combine($outDir, "v2rayNURL.txt")
+$urlFilePath = [IO.Path]::Combine($outDir, "v2-url.txt")
 $urlContent = ($allUrls -join "`r`n") + "`r`n"
 [System.IO.File]::WriteAllText($urlFilePath, $urlContent, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host ""
-Write-Host "  v2rayNURL.txt: $($allUrls.Count) 条链接已生成" -ForegroundColor Green
+Write-Host "  v2-url.txt: $($allUrls.Count) 条链接已生成" -ForegroundColor Green
 
 # ============================================================
-# 10. 写入 v2rayNBase64.txt（订阅格式，一行一条 URL 然后整体 Base64）
+# 10. 写入 v2-Base64.txt（订阅格式，一行一条 URL 然后整体 Base64）
 # ============================================================
 
 $base64Content = ($allUrls -join "`r`n")
 $base64Bytes = [System.Text.Encoding]::UTF8.GetBytes($base64Content)
 $base64String = [System.Convert]::ToBase64String($base64Bytes)
-$base64FilePath = [IO.Path]::Combine($outDir, "v2rayNBase64.txt")
+$base64FilePath = [IO.Path]::Combine($outDir, "v2-Base64.txt")
 $null = [System.IO.File]::WriteAllText($base64FilePath, $base64String, [System.Text.UTF8Encoding]::new($false))
 
-Write-Host "  v2rayNBase64.txt: 订阅格式已生成 ($($base64String.Length) 字符)" -ForegroundColor Green
+Write-Host "  v2-Base64.txt: 订阅格式已生成 ($($base64String.Length) 字符)" -ForegroundColor Green
 
 # ============================================================
 # 11. 生成 map.log
