@@ -16,6 +16,10 @@ if (-not (Test-Path $_envScript)) {
 
 $ProjectRoot = $env:CHROMEGO_PATH
 
+# 端口配置
+$DefaultListenPort = 1080      # 单个节点配置文件使用的监听端口
+$MergedStartPort   = 55001     # 合并文件 config_999.json 的起始监听端口
+
 # ============================================================
 # 1. Python 环境检测 & PyYAML 安装
 # ============================================================
@@ -133,15 +137,17 @@ function ConvertTo-OrderedJson {
 function New-SingBoxConfig {
     param(
         [PSCustomObject]$Outbound,
-        [string]$Tag
+        [string]$Tag,
+        [int]$ListenPort = $DefaultListenPort,
+        [string]$InboundTag = "mixed-in"
     )
     $config = [ordered]@{
         inbounds  = @(
             [ordered]@{
                 type             = "mixed"
-                tag              = "mixed-in"
+                tag              = $InboundTag
                 listen           = "::"
-                listen_port      = 1080
+                listen_port      = $ListenPort
                 set_system_proxy = $false
             }
         )
@@ -155,7 +161,7 @@ function New-SingBoxConfig {
         route     = [ordered]@{
             rules = @(
                 [ordered]@{
-                    inbound = "mixed-in"
+                    inbound = $InboundTag
                     action  = "sniff"
                 }
             )
@@ -532,6 +538,7 @@ $idx = 1
 $okCount = 0
 $failCount = 0
 $sourceToOutput = @{}  # 源文件路径 -> 输出 config_N.json
+$allResults = [System.Collections.ArrayList]@()  # 用于生成 config_999.json
 
 foreach ($f in $allFiles) {
     $outName = "config_$idx.json"
@@ -555,6 +562,7 @@ foreach ($f in $allFiles) {
         [System.IO.File]::WriteAllText($outPath, $jsonStr, [System.Text.UTF8Encoding]::new($false))
 
         $sourceToOutput[$f.SourcePath] = $outName
+        $null = $allResults.Add($result)
 
         $protocol = $result.Outbound.type
         Write-Host "  [$idx] OK  $sourceLabel  ->  $outName  ($protocol)" -ForegroundColor Green
@@ -646,7 +654,65 @@ $mapOut = [IO.Path]::Combine($outDir, "map.log")
 Write-Host "  map.log: 映射记录已生成" -ForegroundColor Green
 
 # ============================================================
-# 14. 输出汇总
+# 14. 生成合并节点文件 config_999.json
+# ============================================================
+
+if ($allResults.Count -gt 0) {
+    $mergedInbounds  = [System.Collections.ArrayList]@()
+    $mergedOutbounds = [System.Collections.ArrayList]@()
+    $mergedRules     = [System.Collections.ArrayList]@()
+
+    for ($i = 0; $i -lt $allResults.Count; $i++) {
+        $port       = $MergedStartPort + $i
+        $inTag      = "in-$($i + 1)"
+        $outTag     = $allResults[$i].Tag
+        $outbound   = $allResults[$i].Outbound
+
+        # 每个节点一个独立 inbound
+        $null = $mergedInbounds.Add([ordered]@{
+            type             = "mixed"
+            tag              = $inTag
+            listen           = "::"
+            listen_port      = $port
+            set_system_proxy = $false
+        })
+
+        # 出站
+        $null = $mergedOutbounds.Add($outbound)
+
+        # 路由规则：该 inbound → 对应 outbound
+        $null = $mergedRules.Add([ordered]@{
+            inbound  = $inTag
+            outbound = $outTag
+        })
+    }
+
+    # 加 direct 兜底
+    $null = $mergedOutbounds.Add([ordered]@{
+        type = "direct"
+        tag  = "direct"
+    })
+
+    $mergedConfig = [ordered]@{
+        inbounds  = $mergedInbounds
+        outbounds = $mergedOutbounds
+        route     = [ordered]@{
+            rules = $mergedRules
+            final = "direct"
+        }
+    }
+
+    $mergedPath = [IO.Path]::Combine($outDir, "config_999.json")
+    $mergedJson = ConvertTo-OrderedJson -Object $mergedConfig
+    [System.IO.File]::WriteAllText($mergedPath, $mergedJson, [System.Text.UTF8Encoding]::new($false))
+
+    $startPort = $MergedStartPort
+    $endPort   = $MergedStartPort + $allResults.Count - 1
+    Write-Host "  config_999.json: $($allResults.Count) 个节点合并, 端口 $startPort~$endPort" -ForegroundColor Green
+}
+
+# ============================================================
+# 15. 输出汇总
 # ============================================================
 
 Write-Host ""
