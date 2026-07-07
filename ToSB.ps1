@@ -1,6 +1,6 @@
-# ToSBNode.ps1
+# ToSB.ps1
 # 将 Hysteria v1/v2、ClashMeta、SingBox 节点配置转换为统一的 SingBox 格式
-# 输出到 ToSBNode/ 目录，按 config_N.json 命名
+# 输出到 ToSB/ 目录，按 config_N.json 命名
 
 $ErrorActionPreference = "Stop"
 $script:PythonExe = $null
@@ -503,7 +503,7 @@ foreach ($srcName in $sources.Keys) {
 
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Cyan
-Write-Host "             ToSBNode - 节点配置转换工具                 " -ForegroundColor Cyan
+Write-Host "               ToSB - 节点配置转换工具                   " -ForegroundColor Cyan
 Write-Host "═══════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 
@@ -527,7 +527,7 @@ foreach ($srcName in $sources.Keys) {
     Write-Host " └─" -ForegroundColor DarkGray
 }
 Write-Host ""
-Write-Host " 输出目录: $([IO.Path]::Combine($ProjectRoot, 'ToSBNode'))" -ForegroundColor Green
+Write-Host " 输出目录: $([IO.Path]::Combine($ProjectRoot, 'ToSB'))" -ForegroundColor Green
 Write-Host " 文件总计: $globalCount 个文件待转换" -ForegroundColor Green
 Write-Host ""
 
@@ -545,7 +545,7 @@ if ($confirm -ne '' -and $confirm -ne 'y' -and $confirm -ne 'Y') {
 # 11. 执行转换
 # ============================================================
 
-$outDir = [IO.Path]::Combine($ProjectRoot, "ToSBNode")
+$outDir = [IO.Path]::Combine($ProjectRoot, "ToSB")
 
 # 清空或创建输出目录
 if (Test-Path $outDir) {
@@ -654,7 +654,7 @@ else {
 # ============================================================
 
 $mapLog = [System.Text.StringBuilder]::new()
-$null = $mapLog.AppendLine("ToSBNode 转换映射记录")
+$null = $mapLog.AppendLine("ToSB 转换映射记录")
 $null = $mapLog.AppendLine("生成时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
 $null = $mapLog.AppendLine("")
 
