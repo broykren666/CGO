@@ -274,7 +274,7 @@ function Convert-Hysteria2Config {
     $insecure  = [bool]$json.tls.insecure
     $auth      = $json.auth
     $server    = $json.server
-    $nodeName  = "HY2-$($SourceName)"
+    $nodeName  = "HY2-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
 
     $url = New-Hysteria2Url -Server $server -Auth $auth -Sni $sni -Insecure $insecure -NodeName $nodeName
 
@@ -286,12 +286,7 @@ function Convert-XrayConfig {
 
     $json = Read-JsonConfig -Path $FilePath
 
-    # 获取服务器名作为备注
-    $vnext = $json.outbounds |
-        Where-Object { $_.protocol -eq 'vless' } |
-        Select-Object -First 1
-    $serverAddr = $vnext.settings.vnext[0].address
-    $nodeName = "VLESS-$serverAddr"
+    $nodeName = "VLESS-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
 
     $url = New-VlessUrl -Config $json -NodeName $nodeName
 
@@ -304,7 +299,7 @@ function Convert-JuicityConfig {
     $json = Read-JsonConfig -Path $FilePath
 
     $hp = Split-HostPort -HostPort $json.server
-    $nodeName = "Juicity-$($hp.host)"
+    $nodeName = "Juicity-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
 
     $url = New-JuicityUrl `
         -Server $json.server `
@@ -326,10 +321,7 @@ function Convert-NaiveProxyConfig {
     # proxy URL 格式: https://user:pass@fan.193919.xyz:44000
     $proxyUrl = $json.proxy
 
-    # 从 URL 提取 host 作为备注
-    $hostMatch = [regex]::Match($proxyUrl, 'https?://[^@]*@([^:/]+)')
-    $hostName = if ($hostMatch.Success) { $hostMatch.Groups[1].Value } else { $SourceName }
-    $nodeName = "Naive-$hostName"
+    $nodeName = "Naive-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
 
     $url = New-NaiveProxyUrl -ProxyUrl $proxyUrl -NodeName $nodeName
 
@@ -355,8 +347,7 @@ function Convert-SingBoxConfig {
         throw "不支持的 SingBox 代理类型: $($proxy.type)"
     }
 
-    $nodeName = $proxy.tag
-    if (-not $nodeName -or $nodeName -eq '') { $nodeName = "TUIC-$($proxy.server)" }
+    $nodeName = "SB-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
 
     # ALPN 处理：可能是数组或字符串
     $alpn = @()
@@ -426,8 +417,7 @@ print(json.dumps(filtered, ensure_ascii=False))
     # 每个文件只有一个 proxy（取第一个）
     $proxy = if ($proxies -is [array]) { $proxies[0] } else { $proxies }
     $proxyType = $proxy.type
-    $nodeName  = $proxy.name
-    if (-not $nodeName) { $nodeName = "$proxyType-$($proxy.server)" }
+    $nodeName  = "CM-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
 
     switch ($proxyType) {
         'hysteria2' {
