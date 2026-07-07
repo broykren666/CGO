@@ -76,6 +76,17 @@ function Read-JsonConfig {
     return $raw | ConvertFrom-Json
 }
 
+# 构建节点备注名（前缀-文件名-国家代码）
+function Get-NodeName {
+    param([string]$Prefix, [string]$SourceName)
+    $baseName = [IO.Path]::GetFileNameWithoutExtension($SourceName)
+    $country = ""
+    if ($Script:CountryMap.ContainsKey($baseName)) {
+        $country = "-" + $Script:CountryMap[$baseName]
+    }
+    return "$Prefix-$baseName$country"
+}
+
 # ============================================================
 # 3. 各协议 → v2rayN 分享链接 URL
 # ============================================================
@@ -275,7 +286,7 @@ function Convert-Hysteria2Config {
     $insecure  = [bool]$json.tls.insecure
     $auth      = $json.auth
     $server    = $json.server
-    $nodeName  = "HY2-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
+    $nodeName  = Get-NodeName -Prefix "HY2" -SourceName $SourceName
 
     $url = New-Hysteria2Url -Server $server -Auth $auth -Sni $sni -Insecure $insecure -NodeName $nodeName
 
@@ -287,7 +298,7 @@ function Convert-XrayConfig {
 
     $json = Read-JsonConfig -Path $FilePath
 
-    $nodeName = "VLESS-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
+    $nodeName = Get-NodeName -Prefix "VLESS" -SourceName $SourceName
 
     $url = New-VlessUrl -Config $json -NodeName $nodeName
 
@@ -300,7 +311,7 @@ function Convert-JuicityConfig {
     $json = Read-JsonConfig -Path $FilePath
 
     $hp = Split-HostPort -HostPort $json.server
-    $nodeName = "Juicity-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
+    $nodeName = Get-NodeName -Prefix "Juicity" -SourceName $SourceName
 
     $url = New-JuicityUrl `
         -Server $json.server `
@@ -322,7 +333,7 @@ function Convert-NaiveProxyConfig {
     # proxy URL 格式: https://user:pass@fan.193919.xyz:44000
     $proxyUrl = $json.proxy
 
-    $nodeName = "Naive-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
+    $nodeName = Get-NodeName -Prefix "Naive" -SourceName $SourceName
 
     $url = New-NaiveProxyUrl -ProxyUrl $proxyUrl -NodeName $nodeName
 
@@ -348,7 +359,7 @@ function Convert-SingBoxConfig {
         throw "不支持的 SingBox 代理类型: $($proxy.type)"
     }
 
-    $nodeName = "SB-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
+    $nodeName = Get-NodeName -Prefix "SB" -SourceName $SourceName
 
     # ALPN 处理：可能是数组或字符串
     $alpn = @()
@@ -418,7 +429,7 @@ print(json.dumps(filtered, ensure_ascii=False))
     # 每个文件只有一个 proxy（取第一个）
     $proxy = if ($proxies -is [array]) { $proxies[0] } else { $proxies }
     $proxyType = $proxy.type
-    $nodeName  = "CM-$([IO.Path]::GetFileNameWithoutExtension($SourceName))"
+    $nodeName  = Get-NodeName -Prefix "CM" -SourceName $SourceName
 
     switch ($proxyType) {
         'hysteria2' {
@@ -526,6 +537,13 @@ foreach ($srcName in $sources.Keys) {
             }
         }
     }
+}
+
+# 构建文件名 → 国家代码映射表（用于节点备注后缀）
+$Script:CountryMap = @{}
+foreach ($key in $nodeCache.Keys) {
+    $noExt = [IO.Path]::GetFileNameWithoutExtension($key)
+    $Script:CountryMap[$noExt] = $nodeCache[$key].Country
 }
 
 # 扫描文件
