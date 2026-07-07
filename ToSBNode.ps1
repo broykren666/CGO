@@ -482,6 +482,21 @@ if ($allFiles.Count -eq 0) {
     exit 0
 }
 
+# 读取每个来源目录的 .node_cache（格式: config_X.json|国家|IP）
+$nodeCache = @{}
+foreach ($srcName in $sources.Keys) {
+    $cacheFile = [IO.Path]::Combine($sources[$srcName].Dir, ".node_cache")
+    if (-not (Test-Path $cacheFile)) { continue }
+    $lines = Get-Content $cacheFile -Encoding UTF8
+    foreach ($line in $lines) {
+        $trimmed = $line.Trim()
+        if ($trimmed -eq '') { continue }
+        $parts = $trimmed -split '\|', 3
+        if ($parts.Length -lt 3) { continue }
+        $nodeCache[$parts[0]] = @{ Country = $parts[1]; IP = $parts[2] }
+    }
+}
+
 # ============================================================
 # 9. 列出待转换文件
 # ============================================================
@@ -500,8 +515,14 @@ foreach ($srcName in $sources.Keys) {
     Write-Host " ├─ $($sources[$srcName].Dir)" -ForegroundColor DarkGray
     foreach ($f in $srcFiles) {
         $globalCount++
+        $cacheInfo = ""
+        if ($nodeCache.ContainsKey($f.FileName)) {
+            $ci = $nodeCache[$f.FileName]
+            $cacheInfo = "  [$($ci.Country)] $($ci.IP)"
+        }
         Write-Host " │  " -ForegroundColor DarkGray -NoNewline
-        Write-Host "$($f.FileName)" -ForegroundColor White
+        Write-Host "$($f.FileName)" -ForegroundColor White -NoNewline
+        Write-Host $cacheInfo -ForegroundColor DarkGray
     }
     Write-Host " └─" -ForegroundColor DarkGray
 }
