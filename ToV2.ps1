@@ -298,7 +298,7 @@ function Convert-XrayConfig {
 
     $json = Read-JsonConfig -Path $FilePath
 
-    $nodeName = Get-NodeName -Prefix "VLESS" -SourceName $SourceName
+    $nodeName = Get-NodeName -Prefix "Xray" -SourceName $SourceName
 
     $url = New-VlessUrl -Config $json -NodeName $nodeName
 
