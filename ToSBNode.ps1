@@ -77,6 +77,18 @@ function New-NodeTag {
     return "$Protocol-$($Server)-$Port"
 }
 
+# 净化 tag 中的特殊字符（/ \ : . → -，用于合并文件防冲突）
+function Sanitize-Tag {
+    param([string]$Tag)
+    $clean = $Tag -replace '[\/\\: ]+', '-'
+    # 合并连续的 -
+    while ($clean -match '--') {
+        $clean = $clean -replace '--', '-'
+    }
+    # 去掉首尾 -
+    return $clean.Trim('-')
+}
+
 # 自定义 JSON 序列化（保持 [ordered] 字段顺序）
 function ConvertTo-OrderedJson {
     param($Object, [int]$Depth = 10, [int]$Indent = 0)
@@ -211,11 +223,6 @@ function Convert-Hysteria1ToSB {
     # 混淆
     if ($json.obfs -and $json.obfs -ne '') {
         $outbound.obfs = $json.obfs
-    }
-
-    # 传输协议
-    if ($json.protocol) {
-        $outbound.protocol = $json.protocol
     }
 
     # QUIC 参数
@@ -361,10 +368,6 @@ print(json.dumps(filtered, ensure_ascii=False))
                     $outbound.tls.alpn = @($proxy.alpn.ToString())
                 }
             }
-            # 传输协议
-            if ($proxy.protocol) {
-                $outbound.protocol = $proxy.protocol
-            }
         }
         'tuic' {
             $tag = New-NodeTag -Protocol "tuic-cm" -Server $proxy.server -Port $proxy.port
@@ -463,6 +466,8 @@ foreach ($srcName in $sources.Keys) {
     }
     $files = Get-ChildItem -Path $dirPath -Filter $info.Pattern -File | Sort-Object Name
     foreach ($f in $files) {
+        # 排除合并输出文件（防止被意外当作源文件）
+        if ($f.Name -eq "config_999.json") { continue }
         $null = $allFiles.Add(@{
             Source     = $srcName
             SourcePath = $f.FullName
@@ -661,12 +666,32 @@ if ($allResults.Count -gt 0) {
     $mergedInbounds  = [System.Collections.ArrayList]@()
     $mergedOutbounds = [System.Collections.ArrayList]@()
     $mergedRules     = [System.Collections.ArrayList]@()
+    $seenTags        = @{}  # 去重：tag → 出现次数
 
     for ($i = 0; $i -lt $allResults.Count; $i++) {
         $port       = $MergedStartPort + $i
         $inTag      = "in-$($i + 1)"
-        $outTag     = $allResults[$i].Tag
+        $outTag     = Sanitize-Tag -Tag $allResults[$i].Tag
         $outbound   = $allResults[$i].Outbound
+
+        # 去重：如果 tag 已存在，追加序号
+        if ($seenTags.ContainsKey($outTag)) {
+            $seenTags[$outTag] = $seenTags[$outTag] + 1
+            $outTag = "$outTag-$($seenTags[$outTag])"
+        }
+        else {
+            $seenTags[$outTag] = 1
+        }
+
+        # 克隆 outbound 并替换 tag（避免修改原始对象影响单个文件）
+        $cloned = [ordered]@{}
+        if ($outbound -is [System.Collections.IDictionary]) {
+            foreach ($k in $outbound.Keys) { $cloned[$k] = $outbound[$k] }
+        }
+        else {
+            $outbound.PSObject.Properties | ForEach-Object { $cloned[$_.Name] = $_.Value }
+        }
+        $cloned['tag'] = $outTag
 
         # 每个节点一个独立 inbound
         $null = $mergedInbounds.Add([ordered]@{
@@ -677,8 +702,8 @@ if ($allResults.Count -gt 0) {
             set_system_proxy = $false
         })
 
-        # 出站
-        $null = $mergedOutbounds.Add($outbound)
+        # 出站（tag 已去重）
+        $null = $mergedOutbounds.Add($cloned)
 
         # 路由规则：该 inbound → 对应 outbound
         $null = $mergedRules.Add([ordered]@{
