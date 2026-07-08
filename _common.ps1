@@ -784,11 +784,17 @@ function Show-NodeMenu {
         [AllowNull()]
         $NodeCache,
         [Parameter(Mandatory=$true)]
-        [string]$CoreName
+        [string]$CoreName,
+        [string]$UpdateDate = ""
     )
     
+    $titleLine = "  $CoreName 节点选择"
+    if ($UpdateDate) {
+        $titleLine += " (更新于:$UpdateDate)"
+    }
+    
     Write-Host "========================================" -ForegroundColor Green
-    Write-Host "  $CoreName 节点选择" -ForegroundColor Green
+    Write-Host $titleLine -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
     
     for ($i = 0; $i -lt $ConfigFiles.Count; $i++) {
@@ -1065,7 +1071,12 @@ function Invoke-NodeMenu {
             continue
         } else {
             # 有配置文件 → 显示完整菜单
-            Show-NodeMenu -ConfigFiles $configFiles -NodeCache $nodeCache -CoreName $CoreName
+            $cachePath = [IO.Path]::Combine($coreDirAbs, ".node_cache")
+            $updateDate = ""
+            if (Test-Path $cachePath) {
+                $updateDate = (Get-Item $cachePath).LastWriteTime.ToString("yyyy-MM-dd")
+            }
+            Show-NodeMenu -ConfigFiles $configFiles -NodeCache $nodeCache -CoreName $CoreName -UpdateDate $updateDate
             
             $choice = Read-Host "请选择操作 [1-$($configFiles.Count), U=更新, Q=退出]"
             
