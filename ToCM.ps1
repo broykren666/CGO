@@ -1,12 +1,9 @@
 # ToCM.ps1
-# 将 Hysteria v1/v2、Xray(VLESS)、SingBox、Juicity、NaiveProxy、ClashMeta 节点配置
-# 转换为统一的 ClashMeta YAML 格式
+# 将 Hysteria v1/v2、Xray(VLESS)、SingBox、ClashMeta 节点配置
+# 转换为统一的 ClashMeta YAML 格式（不支持: ShadowQuic / Mieru / Juicity / NaiveProxy / Psiphon）
 # 输出目录由 $Script:OutputDirName 变量控制（默认 "ToCM"）
 
-param(
-    [switch]$Yes,
-    [string[]]$SkipSource   # 跳过指定来源，如 -SkipSource Juicity
-)
+param([switch]$Yes)
 
 $ErrorActionPreference = "Stop"
 $Script:OutputDirName = "ToCM"          # 输出目录名，改这里即可
@@ -544,18 +541,6 @@ $sources = [ordered]@{
         Type      = "singbox"
         Converter = ${function:Convert-SingBoxToCM}
     }
-    "Juicity"     = @{
-        Dir       = [IO.Path]::Combine($ProjectRoot, "juicity")
-        Pattern   = "config_*.json"
-        Type      = "juicity"
-        Converter = ${function:Convert-JuicityToCM}
-    }
-    "NaiveProxy"  = @{
-        Dir       = [IO.Path]::Combine($ProjectRoot, "naiveproxy")
-        Pattern   = "config_*.json"
-        Type      = "naiveproxy"
-        Converter = ${function:Convert-NaiveProxyToCM}
-    }
     "ClashMeta"   = @{
         Dir       = [IO.Path]::Combine($ProjectRoot, "clash.meta")
         Pattern   = "config_*.yaml"
@@ -568,17 +553,14 @@ $sources = [ordered]@{
 $unsupportedSources = [ordered]@{
     "ShadowQuic" = "shadowquic 协议不被 ClashMeta 支持"
     "Mieru"      = "mieru 协议不被 ClashMeta 支持"
+    "Juicity"    = "juicity 协议不被 Clash Verge Rev 内置内核支持"
+    "NaiveProxy" = "naive 协议不被 Clash Verge Rev 内置内核支持"
     "Psiphon"    = "无标准配置格式"
 }
 
 # 扫描文件
 $allFiles = [System.Collections.ArrayList]@()
-$skippedSources = @()
 foreach ($srcName in $sources.Keys) {
-    if ($SkipSource -contains $srcName) {
-        $skippedSources += $srcName
-        continue
-    }
     $info = $sources[$srcName]
     $dirPath = $info.Dir
     if (-not (Test-Path $dirPath)) {
@@ -649,9 +631,6 @@ foreach ($srcName in $sources.Keys) {
         Write-Host $cacheInfo -ForegroundColor DarkGray
     }
     Write-Host " └─" -ForegroundColor DarkGray
-    if ($srcName -eq "Juicity") {
-        Write-Host "     ⚠ Clash Verge Rev 内置内核不支持 juicity 协议，如需导入请加 -SkipSource Juicity" -ForegroundColor DarkYellow
-    }
 }
 
 # 列出不支持的内核（含文件统计）
@@ -662,6 +641,8 @@ foreach ($name in $unsupportedSources.Keys) {
     $dirMap = @{
         "ShadowQuic" = "shadowquic"
         "Mieru"      = "mieru"
+        "Juicity"    = "juicity"
+        "NaiveProxy" = "naiveproxy"
         "Psiphon"    = "psiphon"
     }
     $dir = [IO.Path]::Combine($ProjectRoot, $dirMap[$name])
@@ -675,22 +656,6 @@ foreach ($name in $unsupportedSources.Keys) {
             }
             Write-Host "   ✗ $name  ($count 个文件) — $reason" -ForegroundColor DarkGray
         }
-    }
-}
-
-# 列出 -SkipSource 跳过的来源
-if ($skippedSources.Count -gt 0) {
-    Write-Host ""
-    Write-Host " [手动跳过]（-SkipSource 参数）" -ForegroundColor DarkMagenta
-    foreach ($s in $skippedSources) {
-        $dir = $sources[$s].Dir
-        $count = 0
-        if (Test-Path $dir) {
-            $count = @(Get-ChildItem -Path $dir -Filter $sources[$s].Pattern -File -ErrorAction SilentlyContinue).Count
-        }
-        $compatNote = ""
-        if ($s -eq "Juicity") { $compatNote = " — Clash Verge Rev 内置内核不支持 juicity 协议，建议跳过" }
-        Write-Host "   ⊘ $s  ($count 个文件)$compatNote" -ForegroundColor DarkGray
     }
 }
 
