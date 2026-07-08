@@ -828,7 +828,7 @@ merged_config = {
     'rules': ['MATCH,\U0001f680 \u8282\u70b9\u9009\u62e9']
 }
 
-merged_path = os.path.join(output_dir, 'config.yaml')
+merged_path = os.path.join(output_dir, 'config_999.yaml')
 with open(merged_path, 'w', encoding='utf-8') as f:
     yaml.dump(merged_config, f, allow_unicode=True, default_flow_style=False,
               sort_keys=False, indent=2, width=200)
