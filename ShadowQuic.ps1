@@ -10,7 +10,7 @@ Initialize-Script -Title "ShadowQuic 一键启动" -ScriptPath $PSCommandPath
 $CORE_NAME = "ShadowQuic"
 $CORE_DIR = "shadowquic"
 $CORE_EXE = "shadowquic.exe"
-# ======================================================================
+# =================================================
 
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
 $_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)

@@ -10,7 +10,7 @@ Initialize-Script -Title "Juicity 一键启动" -ScriptPath $PSCommandPath
 $CORE_NAME = "Juicity"
 $CORE_DIR = "juicity"
 $CORE_EXE = "juicity-client.exe"
-# ======================================================================
+# =================================================
 
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
 $_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)

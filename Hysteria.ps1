@@ -10,7 +10,7 @@ Initialize-Script -Title "Hysteria 一键启动" -ScriptPath $PSCommandPath
 $CORE_NAME = "Hysteria"
 $CORE_DIR = "hysteria"
 $CORE_EXE = "hysteria-tun-windows-6.0-386.exe"
-# ======================================================================
+# =================================================
 
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
 $_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)

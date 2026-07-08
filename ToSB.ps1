@@ -612,7 +612,11 @@ foreach ($f in $allFiles) {
         [System.IO.File]::WriteAllText($outPath, $jsonStr, [System.Text.UTF8Encoding]::new($false))
 
         $sourceToOutput[$f.SourcePath] = $outName
-        $null = $allResults.Add($result)
+        $null = $allResults.Add(@{
+            Result   = $result
+            Source   = $f.Source
+            FileName = $f.FileName
+        })
 
         $protocol = $result.Outbound.type
         Write-Host "  [$idx] OK  $sourceLabel  ->  $outName  ($protocol)" -ForegroundColor Green
@@ -713,11 +717,30 @@ if ($allResults.Count -gt 0) {
     $mergedRules     = [System.Collections.ArrayList]@()
     $seenTags        = @{}  # 去重：tag → 出现次数
 
+    # 来源类型 → 前缀映射
+    $prefixMap = @{
+        "Hysteria v1" = "HY1"
+        "Hysteria v2" = "HY2"
+        "ClashMeta"   = "CM"
+        "SingBox"     = "SB"
+    }
+
     for ($i = 0; $i -lt $allResults.Count; $i++) {
         $port       = $MergedStartPort + $i
-        $inTag      = "in-$($i + 1)"
-        $outTag     = Sanitize-Tag -Tag $allResults[$i].Tag
-        $outbound   = $allResults[$i].Outbound
+        $outTag     = Sanitize-Tag -Tag $allResults[$i].Result.Tag
+        $outbound   = $allResults[$i].Result.Outbound
+
+        # 构建描述性 inbound tag: HY2-config_1-FR
+        $itemSource   = $allResults[$i].Source
+        $itemFileName = $allResults[$i].FileName
+        $prefix       = $prefixMap[$itemSource]
+        $fileBase     = [IO.Path]::GetFileNameWithoutExtension($itemFileName)
+        $countrySuffix = ""
+        if ($nodeCache.ContainsKey($itemFileName)) {
+            $ci = $nodeCache[$itemFileName]
+            $countrySuffix = "-$($ci.Country)"
+        }
+        $inTag = "$prefix-$fileBase$countrySuffix"
 
         # 去重：如果 tag 已存在，追加序号
         if ($seenTags.ContainsKey($outTag)) {

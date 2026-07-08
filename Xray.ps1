@@ -6,11 +6,11 @@ if (-not (Test-Path $_envScript)) { $_envScript = Join-Path (Split-Path $PSScrip
 . (Join-Path $env:CHROMEGO_PATH "_common.ps1")
 Initialize-Script -Title "Xray 一键启动" -ScriptPath $PSCommandPath
 
-# ==================== 配置常量（请根据实际情况修改） ====================
+# ==================== 配置常量 ====================
 $CORE_NAME = "Xray"
 $CORE_DIR = "Xray"
 $CORE_EXE = "xray.exe"
-# ======================================================================
+# =================================================
 
 # 所有路径基于 CHROMEGO_PATH
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)

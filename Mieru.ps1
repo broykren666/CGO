@@ -10,7 +10,7 @@ Initialize-Script -Title "Mieru 一键启动" -ScriptPath $PSCommandPath
 $CORE_NAME = "Mieru"
 $CORE_DIR = "mieru"
 $CORE_EXE = "mieru.exe"
-# ======================================================================
+# =================================================
 
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
 $_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)
