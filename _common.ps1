@@ -469,7 +469,6 @@ function Show-PostLaunchMenu {
         $opts = @()
         if ($SupportSwitch) { $opts += "[S] 切换节点" }
         $opts += "[R] 重启当前"
-        $opts += "[Q] 退出脚本"
 
         Write-Host "========================================" -ForegroundColor Green
         Write-Host "  $($opts -join '  ')" -ForegroundColor Yellow
@@ -495,7 +494,6 @@ function Show-PostLaunchMenu {
         } else {
             $opts += "[R] 重试"
         }
-        $opts += "[Q] 退出脚本"
 
         Write-Host "  $($opts -join '  ')" -ForegroundColor Yellow
         Write-Host "========================================" -ForegroundColor Red
@@ -505,12 +503,12 @@ function Show-PostLaunchMenu {
 
     # 循环读取输入直到有效
     while ($true) {
-        $choice = Read-Host "请选择"
+        $choice = Read-Host "请选择(回车直接退出)"
         $upper = $choice.ToUpper().Trim()
 
         if ($upper -eq 'S' -and $SupportSwitch) { return "switch" }
         if ($upper -eq 'R' -and ($Success -or -not $SupportSwitch)) { return "restart" }
-        if ($upper -eq 'Q') { return "quit" }
+        if ($upper -eq 'Q' -or $upper -eq '') { return "quit" }
 
         Write-Host "无效选择，请重新输入！" -ForegroundColor Red
     }
