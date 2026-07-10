@@ -1,12 +1,12 @@
 # ======================================================================
 # Common.ps1 — 公共函数库
-# 供代理启动脚本引用。启动脚本需先读取 .env 获取 CHROMEGO_PATH，再引用本文件。
+# CHROMEGO_PATH 固定为脚本所在目录，仅从 .env 读取 IPINFO_TOKEN
 # ======================================================================
 
 # ------------------------------------------------------------
-# 加载 .env 配置（CHROMEGO_PATH / IPINFO_TOKEN）
+# 加载 .env 配置（仅 IPINFO_TOKEN）
 # ------------------------------------------------------------
-$Script:CHROMEGO_PATH = ""
+$Script:CHROMEGO_PATH = "$PSScriptRoot"
 $Script:IPINFO_TOKEN = ""
 
 $envFile = Join-Path $PSScriptRoot ".env"
@@ -17,16 +17,12 @@ if (Test-Path $envFile) {
             if ($line -match '^\s*([^=]+?)\s*=\s*(.+?)\s*$') {
                 $k = $matches[1].Trim()
                 $v = $matches[2].Trim().Trim('"').Trim("'")
-                if ($k -eq 'CHROMEGO_PATH') { $Script:CHROMEGO_PATH = $v }
-                if ($k -eq 'IPINFO_TOKEN')   { $Script:IPINFO_TOKEN   = $v }
+                if ($k -eq 'IPINFO_TOKEN') { $Script:IPINFO_TOKEN = $v }
             }
         }
     }
 }
-
-# 回退：.env 不存在时使用默认值
-if (-not $Script:CHROMEGO_PATH) { $Script:CHROMEGO_PATH = "$PSScriptRoot" }
-if (-not $Script:IPINFO_TOKEN)   { $Script:IPINFO_TOKEN   = "311cf96f8bbc1b" }
+if (-not $Script:IPINFO_TOKEN) { $Script:IPINFO_TOKEN = "311cf96f8bbc1b" }
 
 # ------------------------------------------------------------
 # Ensure-Admin: 检查管理员权限，非管理员则自动提权重启
