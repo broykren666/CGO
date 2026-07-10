@@ -1,3 +1,8 @@
 # CGo启动脚本
 
-260710
+.env文件内容示例：
+
+```text
+IPINFO_TOKEN=xxxxxx
+```
+
