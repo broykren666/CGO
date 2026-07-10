@@ -315,9 +315,12 @@ function Wait-CoreStart {
     }
 
     if (-not $isRunning) {
-        Write-Host "警告: 内核可能启动失败，进程已退出。" -ForegroundColor Yellow
         Write-Host ""
-        return
+        Write-Host "========================================" -ForegroundColor Red
+        Write-Host "  内核启动失败，进程已退出" -ForegroundColor Red
+        Write-Host "========================================" -ForegroundColor Red
+        Write-Host ""
+        return $false
     }
 
     # 提取端口信息
@@ -376,6 +379,141 @@ function Wait-CoreStart {
     }
 
     Write-Host ""
+    return $true
+}
+
+# ------------------------------------------------------------
+# Stop-CoreProcess: 终止内核进程
+# 参数: -ProcessId (进程 ID), -CoreExeName (内核 exe 名，用于守护进程兜底)
+# ------------------------------------------------------------
+function Stop-CoreProcess {
+    param(
+        [int]$ProcessId = 0,
+        [string]$CoreExeName = ""
+    )
+
+    # 先尝试按 PID 终止
+    if ($ProcessId -gt 0) {
+        try {
+            $proc = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+            if ($proc -and -not $proc.HasExited) {
+                Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+                Write-Host "已终止进程 (PID: $ProcessId)" -ForegroundColor Gray
+                Start-Sleep -Milliseconds 500
+                return
+            }
+        } catch {}
+    }
+
+    # 兜底：按进程名终止（守护进程模式）
+    if ($CoreExeName) {
+        $procName = [System.IO.Path]::GetFileNameWithoutExtension($CoreExeName)
+        $daemons = Get-Process -Name $procName -ErrorAction SilentlyContinue
+        if ($daemons) {
+            $daemons | Stop-Process -Force -ErrorAction SilentlyContinue
+            Write-Host "已终止进程: $procName" -ForegroundColor Gray
+            Start-Sleep -Milliseconds 500
+        }
+    }
+}
+
+# ------------------------------------------------------------
+# Test-PortInUse: 检测端口是否被占用
+# 参数: -Port (端口号)
+# 返回: @{ InUse=$true/$false; PID=...; ProcessName=... }
+# ------------------------------------------------------------
+function Test-PortInUse {
+    param([int]$Port)
+
+    $result = @{ InUse = $false; PID = 0; ProcessName = "" }
+
+    try {
+        $conn = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($conn) {
+            $procId = $conn.OwningProcess
+            $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+            $procName = if ($proc) { $proc.ProcessName } else { "unknown" }
+            $result = @{ InUse = $true; PID = $procId; ProcessName = $procName }
+        }
+    } catch {}
+
+    return $result
+}
+
+# ------------------------------------------------------------
+# Show-PostLaunchMenu: 内核启动后的交互菜单
+# 参数: -Success (是否启动成功)
+#       -CoreName (内核名称)
+#       -ProcessId (进程 ID，用于终止)
+#       -CoreExeName (内核 exe 名，用于守护进程兜底)
+#       -ConfigPath (配置文件路径，用于端口冲突检测)
+#       -SupportSwitch (是否支持切换节点，Psiphon 无节点菜单时为 $false)
+# 返回: "switch" | "restart" | "quit"
+# ------------------------------------------------------------
+function Show-PostLaunchMenu {
+    param(
+        [Parameter(Mandatory=$true)]
+        [bool]$Success,
+        [Parameter(Mandatory=$true)]
+        [string]$CoreName,
+        [int]$ProcessId = 0,
+        [string]$CoreExeName = "",
+        [string]$ConfigPath = "",
+        [switch]$SupportSwitch
+    )
+
+    Write-Host ""
+
+    if ($Success) {
+        # 成功菜单
+        $opts = @()
+        if ($SupportSwitch) { $opts += "[S] 切换节点" }
+        $opts += "[R] 重启当前"
+        $opts += "[Q] 退出脚本"
+
+        Write-Host "========================================" -ForegroundColor Green
+        Write-Host "  $($opts -join '  ')" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Green
+    } else {
+        # 失败菜单 + 诊断
+        Write-Host "========================================" -ForegroundColor Red
+
+        # 端口冲突检测
+        if ($ConfigPath -and (Test-Path $ConfigPath)) {
+            $ports = Get-ConfigLocalPort -ConfigPath $ConfigPath
+            foreach ($p in $ports) {
+                $portInfo = Test-PortInUse -Port $p.Port
+                if ($portInfo.InUse) {
+                    Write-Host "  端口 $($p.Port) 已被占用 (PID: $($portInfo.PID), $($portInfo.ProcessName))" -ForegroundColor Yellow
+                }
+            }
+        }
+
+        $opts = @()
+        if ($SupportSwitch) {
+            $opts += "[S] 切换节点"
+        } else {
+            $opts += "[R] 重试"
+        }
+        $opts += "[Q] 退出脚本"
+
+        Write-Host "  $($opts -join '  ')" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Red
+    }
+
+    Write-Host ""
+
+    # 循环读取输入直到有效
+    while ($true) {
+        $choice = Read-Host "请选择"
+        $upper = $choice.ToUpper().Trim()
+
+        if ($upper -eq 'S' -and $SupportSwitch) { return "switch" }
+        if ($upper -eq 'R' -and ($Success -or -not $SupportSwitch)) { return "restart" }
+        if ($upper -eq 'Q') { return "quit" }
+
+        Write-Host "无效选择，请重新输入！" -ForegroundColor Red
+    }
 }
 
 # ------------------------------------------------------------

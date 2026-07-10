@@ -15,37 +15,60 @@ $CORE_EXE = "mieru.exe"
 $_workDir = [IO.Path]::Combine($env:CHROMEGO_PATH, $CORE_DIR)
 $_corePath = [IO.Path]::Combine($_workDir, $CORE_EXE)
 
-try {    
+try {
     if (-not (Test-Path $_corePath)) {
         Write-Host "错误: 内核文件不存在: $CORE_EXE ($_corePath)" -ForegroundColor Red
         Press-AnyKey; exit 1
     }
 
-    $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME -ScriptRoot $env:CHROMEGO_PATH
-    if ($null -eq $selectedConfig -or $selectedConfig -eq '') { Press-AnyKey; exit 0 }
+    while ($true) {
+        $selectedConfig = Invoke-NodeMenu -CoreDir $CORE_DIR -CoreName $CORE_NAME -ScriptRoot $env:CHROMEGO_PATH
+        if ($null -eq $selectedConfig -or $selectedConfig -eq '') { exit 0 }
 
-    # 启动内核（mieru 需要先 apply config 再 start，两步操作）
-    $configPath = [IO.Path]::Combine($_workDir, $selectedConfig)
-    if (-not (Test-Path $configPath)) {
-        Write-Host "错误: 配置文件不存在 — $configPath" -ForegroundColor Red
-        Press-AnyKey; exit 1
+        $configPath = [IO.Path]::Combine($_workDir, $selectedConfig)
+        if (-not (Test-Path $configPath)) {
+            Write-Host "错误: 配置文件不存在 — $configPath" -ForegroundColor Red
+            Press-AnyKey -Message "按任意键返回..."
+            Clear-Host
+            continue
+        }
+
+        # 启动循环（支持重启，mieru 需要先 apply config 再 start）
+        while ($true) {
+            Write-Host "当前配置 $configPath" -ForegroundColor Yellow
+
+            # 第一步：apply config
+            $applyResult = & $_corePath apply config $configPath 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "配置应用失败:" -ForegroundColor Red
+                Write-Host $applyResult
+                $success = $false
+                $procId = 0
+            } else {
+                # 第二步：start
+                Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
+                $process = Start-Process -FilePath $_corePath -ArgumentList "start" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
+                $success = Wait-CoreStart -Process $process -ConfigPath $configPath -CoreExeName "mieru"
+                $procId = $process.Id
+            }
+
+            $action = Show-PostLaunchMenu -Success $success -CoreName $CORE_NAME -ProcessId $procId -CoreExeName $CORE_EXE -ConfigPath $configPath -SupportSwitch
+
+            if ($action -eq "switch") {
+                if ($success) { Stop-CoreProcess -ProcessId $procId -CoreExeName $CORE_EXE }
+                Clear-Host
+                break
+            }
+            if ($action -eq "restart") {
+                if ($success) { Stop-CoreProcess -ProcessId $procId -CoreExeName $CORE_EXE }
+                Clear-Host
+                continue
+            }
+            if ($action -eq "quit") {
+                exit 0
+            }
+        }
     }
-
-    # 第一步：apply config
-    Write-Host "当前配置 $configPath" -ForegroundColor Yellow
-    $applyResult = & $_corePath apply config $configPath 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "配置应用失败:" -ForegroundColor Red
-        Write-Host $applyResult
-        Press-AnyKey; exit 1
-    }
-
-    # 第二步：start
-    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
-    $process = Start-Process -FilePath $_corePath -ArgumentList "start" -WorkingDirectory $_workDir -WindowStyle Normal -PassThru
-    Wait-CoreStart -Process $process -ConfigPath $configPath -CoreExeName "mieru"
-    Write-Host "内核已启动，按任意键关闭此窗口..." -ForegroundColor Yellow
-    [Console]::ReadKey($true) | Out-Null
 }
 catch {
     Write-Host "发生错误: $_" -ForegroundColor Red

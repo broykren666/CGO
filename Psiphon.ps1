@@ -11,24 +11,36 @@ try {
     Show-Banner -Title "Psiphon 一键启动"
 
     $corePath = Test-CoreFile -CoreDir $CORE_DIR -CoreExe $CORE_EXE
-
-    # 启动 psiphon3.exe
     $workingDir = Join-Path $PSScriptRoot $CORE_DIR
-    Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
-    $process = Start-Process -FilePath $corePath -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
 
-    Write-Host "start..." -ForegroundColor Gray
+    # 启动循环（支持重启/重试）
+    while ($true) {
+        Write-Host "正在启动 $CORE_EXE 请稍候..." -ForegroundColor Yellow
+        $process = Start-Process -FilePath $corePath -WorkingDirectory $workingDir -WindowStyle Normal -PassThru
+        Write-Host "start..." -ForegroundColor Gray
 
-    # 执行 setting.vbs（等待完成）
-    $vbsPath = Join-Path $workingDir "setting.vbs"
-    if (Test-Path $vbsPath) {
-        Write-Host "正在执行 setting.vbs..." -ForegroundColor Cyan
-        Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbsPath`"" -WorkingDirectory $workingDir -Wait
-    } else {
-        Write-Host "警告: setting.vbs 不存在: $vbsPath" -ForegroundColor Yellow
+        # 执行 setting.vbs（等待完成）
+        $vbsPath = Join-Path $workingDir "setting.vbs"
+        if (Test-Path $vbsPath) {
+            Write-Host "正在执行 setting.vbs..." -ForegroundColor Cyan
+            Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbsPath`"" -WorkingDirectory $workingDir -Wait
+        } else {
+            Write-Host "警告: setting.vbs 不存在: $vbsPath" -ForegroundColor Yellow
+        }
+
+        $success = Wait-CoreStart -Process $process
+
+        $action = Show-PostLaunchMenu -Success $success -CoreName $CORE_NAME -ProcessId $process.Id -CoreExeName $CORE_EXE
+
+        if ($action -eq "restart") {
+            if ($success) { Stop-CoreProcess -ProcessId $process.Id -CoreExeName $CORE_EXE }
+            Clear-Host
+            continue
+        }
+        if ($action -eq "quit") {
+            exit 0
+        }
     }
-
-    Wait-CoreStart -Process $process
 
 } catch {
     Write-Host "发生错误: $_" -ForegroundColor Red
